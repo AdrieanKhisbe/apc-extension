@@ -1,0 +1,38 @@
+name: VS Code activation
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  activation:
+    name: Activation / VS Code ${{ matrix.vscode }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        vscode: ['1.140.0', 'stable']
+    env:
+      VSCODE_VERSION: ${{ matrix.vscode }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - name: Compile, lint, and reproduce activation in a real VS Code
+        run: xvfb-run -a npm test
+      - name: Upload extension host logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: vscode-${{ matrix.vscode }}-logs
+          path: .vscode-test/runs/**/logs/**
+          include-hidden-files: true
+          if-no-files-found: ignore

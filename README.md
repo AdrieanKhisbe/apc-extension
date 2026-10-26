@@ -16,6 +16,22 @@ Unlike its predecessor, it ships with no default settings, granting you full cus
 
 Explore my setup for inspiration: [View Settings](https://github.com/drcika/apc-extension/blob/production/demo/settings.json)
 
+## Activation regression test
+
+With Node.js 22 or newer, run `npm ci` then `npm test`. The test compiles and lints the extension, downloads
+VS Code 1.140.0 into `.vscode-test`, and launches its real extension host with
+isolated user data and extensions. APC is enabled normally and the test executes
+`apc.extension.enable`. It never launches the machine's installed editor.
+
+Use `VSCODE_VERSION=stable npm test` to test the latest stable release. On Linux,
+run `xvfb-run -a npm test` to provide a display.
+
+The GitHub Actions activation workflow tests both 1.140.0 and latest stable,
+and uploads editor logs even when a test fails. The current activation bug is
+expected to make these tests fail; failures are not suppressed. Passing this
+test after a fix proves activation and command execution, not CSS/JS import or
+layout compatibility.
+
 ## Getting Started
 
   - Open Visual Studio Code
