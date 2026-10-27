@@ -61,10 +61,15 @@ function addButton(context: vscode.ExtensionContext, button: ButtonConfig) {
 
 let buttons: Array<vscode.StatusBarItem> | undefined = undefined;
 
-export function applyButtons(context: vscode.ExtensionContext) {
+export function disposeButtons() {
   if (buttons) { buttons.forEach(button => button.dispose()); }
+  buttons = undefined;
   subscriptions.forEach(subs => subs.dispose());
   subscriptions = [];
+}
+
+export function applyButtons(context: vscode.ExtensionContext) {
+  disposeButtons();
 
   const config = vscode.workspace.getConfiguration('apc').get<Array<ButtonConfig>>('buttons');
   buttons = config?.map(button => addButton(context, button));

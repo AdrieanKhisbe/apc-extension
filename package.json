@@ -443,7 +443,7 @@
     "vscode:prepublish": "npm run compile",
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
-    "pretest": "npm run compile && npm run lint",
+    "pretest": "npm run compile && npm run lint && node --test test/lifecycle.test.js",
     "lint": "eslint src --ext ts",
     "test": "node ./test/runTest.js"
   },

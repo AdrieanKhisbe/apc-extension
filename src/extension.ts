@@ -1,8 +1,8 @@
 import * as vscode from 'vscode';
 
-import { applyButtons } from './buttons/button';
+import { applyButtons, disposeButtons } from './buttons/button';
 import * as customizations from './customizations.json';
-import { ensurePatch, uninstallPatch, install, appendIframeStyles } from './patch';
+import { ensurePatch, uninstallPatch, install, appendIframeStyles, disposePatch } from './patch';
 import { promptRestart } from './utils';
 
 function changeTheme(context: vscode.ExtensionContext) {
@@ -18,49 +18,64 @@ function changeTheme(context: vscode.ExtensionContext) {
   config.update('workbench.colorCustomizations', colorCustomizations, true);
 }
 
-function registerCommands(context: vscode.ExtensionContext) {
-  context.subscriptions.push(vscode.commands.registerCommand('apc.extension.enable', () => {
-    install(context);
-    context.globalState.update('isEnabled', true);
-  }));
-  context.subscriptions.push(vscode.commands.registerCommand('apc.extension.disable', () => {
-    uninstallPatch();
-    context.globalState.update('isEnabled', false);
-  }));
-
+function reportError(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error);
+  void vscode.window.showErrorMessage(`Apc Extension failed: ${message}`);
 }
 
-
-export function activate(context: vscode.ExtensionContext) {
-  // const isRunned = context.globalState.get('isRunned');
-  const isEnabled = context.globalState.get('isEnabled');
-
-  if (isEnabled !== false) { 
-   ensurePatch(context); 
-   appendIframeStyles();
-  }
-  // else {
-  //   context.globalState.update('isRunned', true);
-  //   install(context);
-  // }
-
-  registerCommands(context);
+export async function activate(context: vscode.ExtensionContext) {
+  let isRunning = false;
+  context.subscriptions.push({ dispose: disposePatch }, { dispose: disposeButtons });
+  context.subscriptions.push(vscode.commands.registerCommand('apc.extension.enable', async () => {
+    try {
+      await install(context);
+      await appendIframeStyles();
+      await context.globalState.update('isEnabled', true);
+      isRunning = true;
+      applyButtons(context);
+    } catch (error) {
+      reportError(error);
+      throw error;
+    }
+  }));
+  context.subscriptions.push(vscode.commands.registerCommand('apc.extension.disable', async () => {
+    try {
+      await uninstallPatch();
+      await context.globalState.update('isEnabled', false);
+      isRunning = false;
+      disposeButtons();
+    } catch (error) {
+      reportError(error);
+      throw error;
+    }
+  }));
 
   async function onDidChangeConfiguration(e: vscode.ConfigurationChangeEvent) {
-    if (!isEnabled) { return; };
-    e.affectsConfiguration('apc.theme') && changeTheme(context);
-    e.affectsConfiguration('apc.buttons') && applyButtons(context);
-    e.affectsConfiguration('apc.iframe.style') && appendIframeStyles();
-    (e.affectsConfiguration('apc.electron') || e.affectsConfiguration('apc.menubar.compact')) && promptRestart();
+    if (!isRunning || context.globalState.get('isEnabled') !== true) { return; }
+    try {
+      e.affectsConfiguration('apc.theme') && changeTheme(context);
+      e.affectsConfiguration('apc.buttons') && applyButtons(context);
+      if (e.affectsConfiguration('apc.iframe.style')) { await appendIframeStyles(); }
+      if (e.affectsConfiguration('apc.electron') || e.affectsConfiguration('apc.menubar.compact')) { await promptRestart(); }
+    } catch (error) { reportError(error); }
   }
-  function onDidChangeWorkspaceFolders(e: vscode.WorkspaceFoldersChangeEvent) {
-    applyButtons(context);
+  context.subscriptions.push(vscode.workspace.onDidChangeConfiguration(onDidChangeConfiguration));
+  context.subscriptions.push(vscode.workspace.onDidChangeWorkspaceFolders(() => {
+    if (isRunning) { applyButtons(context); }
+  }));
+
+  // Commands remain registered even when the application's layout is unsupported
+  // or patching fails. Handle startup failures instead of rejecting activation.
+  if (context.globalState.get('isEnabled') !== false) {
+    try {
+      await ensurePatch(context);
+      await appendIframeStyles();
+      await context.globalState.update('isEnabled', true);
+      isRunning = true;
+    } catch (error) { reportError(error); }
   }
 
   applyButtons(context);
-
-  isEnabled && context.subscriptions.push(vscode.workspace.onDidChangeWorkspaceFolders(onDidChangeWorkspaceFolders));
-  isEnabled && context.subscriptions.push(vscode.workspace.onDidChangeConfiguration(onDidChangeConfiguration));
 }
 
 export function deactivate() {

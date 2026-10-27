@@ -27,10 +27,11 @@ Use `VSCODE_VERSION=stable npm test` to test the latest stable release. On Linux
 run `xvfb-run -a npm test` to provide a display.
 
 The GitHub Actions activation workflow tests both 1.140.0 and latest stable,
-and uploads editor logs even when a test fails. The current activation bug is
-expected to make these tests fail; failures are not suppressed. Passing this
-test after a fix proves activation and command execution, not CSS/JS import or
-layout compatibility.
+and uploads editor logs even when a test fails. Focused lifecycle regressions
+run before the real-editor test. Activation now survives unsupported application
+layouts; the end-to-end enable test still fails explicitly until the modern
+patcher is implemented. Failures are not suppressed. Passing this test proves
+activation and command execution, not CSS/JS import or layout compatibility.
 
 ## Getting Started
 

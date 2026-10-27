@@ -16,6 +16,14 @@ exports.run = async function () {
     console.error('APC activation error:', error);
   }
 
+  if (!activationError) {
+    assert.ok(extension.isActive, 'APC must activate successfully');
+    const commands = await vscode.commands.getCommands(true);
+    assert.ok(commands.includes('apc.extension.enable'), 'APC enable command must be available');
+    assert.ok(commands.includes('apc.extension.disable'), 'APC disable command must be available');
+    console.log('CHECKPOINT: APC activated and both commands are available.');
+  }
+
   try {
     await vscode.commands.executeCommand('apc.extension.enable');
   } catch (error) {

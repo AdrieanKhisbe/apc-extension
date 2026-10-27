@@ -13,7 +13,7 @@ const mainProcessJsName = 'process.main.js';
 const workbenchHtmlName = 'workbench.html';
 const browserMain = 'browser.main.js';
 
-const installationPath = path.dirname(require.main!.filename);
+const installationPath = path.join(vscode.env.appRoot, 'out');
 const bootstrapPath = path.join(installationPath, bootstrapName);
 const bootstrapBackupPath = bootstrapPath + bkpName;
 const mainJsPath = path.join(installationPath, mainJsName);
@@ -47,37 +47,50 @@ function appendIframeStyle(iframeStyle: Record<string, string> | string) {
     .replace('meta http-equiv="Content-Security-Policy"', 'meta http-equiv=""')
     .replace('blockquote {', `${style}\n\t\t\tblockquote {`);
 
-  fs.writeFile(iframeIndexPath, iframeIndex, 'utf8', () => { });
+  fs.writeFileSync(iframeIndexPath, iframeIndex, 'utf8');
 }
 
 function getIframeConfig() {
   return getConfiguration<Record<string, string> | string>('apc.iframe.style') || '';
 }
 let fileWatcher: fs.FSWatcher | undefined;
+export function disposePatch() {
+  fileWatcher?.close();
+  fileWatcher = undefined;
+}
+
 export async function appendIframeStyles() {
-  try {
-    fileWatcher?.close?.();
-    const iframeStyle = getIframeConfig();
-    if (iframeStyle) {
-      if (!fs.existsSync(iframeIndexBkpPath)) { fs.renameSync(iframeIndexPath, iframeIndexBkpPath); }
+  disposePatch();
+  const iframeStyle = getIframeConfig();
+  if (iframeStyle) {
+    if (!fs.existsSync(iframeIndexBkpPath)) { fs.renameSync(iframeIndexPath, iframeIndexBkpPath); }
 
-      appendIframeStyle(iframeStyle);
+    appendIframeStyle(iframeStyle);
 
-      fileWatcher = typeof iframeStyle === 'string' ? fs.watch(iframeStyle, 'utf8', () => appendIframeStyle(getIframeConfig())) : undefined;
-    }
-    else { restoreIframe(); };
-  } catch (error) {
-    console.trace(error);
+    fileWatcher = typeof iframeStyle === 'string' ? fs.watch(iframeStyle, 'utf8', () => {
+      try { appendIframeStyle(getIframeConfig()); }
+      catch (error) { void vscode.window.showErrorMessage(`Apc iframe styles failed: ${error}`); }
+    }) : undefined;
   }
+  else { restoreIframe(); }
 }
 
 function restoreIframe() {
   if (fs.existsSync(iframeIndexBkpPath)) {
-    fs.rename(iframeIndexBkpPath, iframeIndexPath, () => { });
+    fs.renameSync(iframeIndexBkpPath, iframeIndexPath);
+  }
+}
+
+function assertLegacyLayout() {
+  const main = fs.existsSync(mainJsPath) ? fs.readFileSync(mainJsPath, 'utf8') : '';
+  if (!fs.existsSync(bootstrapPath) || !fs.existsSync(workbenchHtmlPath) ||
+      (!main.includes('require_bootstrap_amd()') && !main.includes('require("./bootstrap-amd")'))) {
+    throw new Error(`VS Code ${vscode.version} is not supported by APC's legacy AMD patcher. Modern workbench support is not yet implemented; no patch files were written.`);
   }
 }
 
 export async function ensurePatch(context: vscode.ExtensionContext) {
+  assertLegacyLayout();
   if (
     !fs.readFileSync(mainJsPath, 'utf8')?.includes('require("./bootstrap-amd")') ||
     !fs.existsSync(workbenchHtmlReplacementPath) ||
@@ -158,7 +171,6 @@ function restoreMain() {
     // restore main.js
     fs.renameSync(mainJsBackupPath, mainJsPath);
     // remove bkp file
-    fs.rm(mainJsBackupPath, () => { });
   }
   // remove pached modules
   fs.existsSync(patchPath) && fs.rmSync(patchPath, { recursive: true, force: true });
@@ -223,24 +235,23 @@ function patchWorkbench(extensionPath: string) {
 }
 
 function restoreWorkbench() {
-  fs.existsSync(workbenchHtmlReplacementPath) && fs.rm(workbenchHtmlReplacementPath, () => { });
+  fs.existsSync(workbenchHtmlReplacementPath) && fs.rmSync(workbenchHtmlReplacementPath);
 }
 
 export async function install(context: vscode.ExtensionContext) {
-  try {
-    const extensionPath = context.extensionPath;
-    patchBootstrap(extensionPath);
-    patchMain(extensionPath);
-    patchWorkbench(extensionPath);
-    promptRestart();
-  } catch (e) {
-    vscode.window.showErrorMessage(`Apc Extension failed: ${e}`);
-  }
+  assertLegacyLayout();
+  const extensionPath = context.extensionPath;
+  patchBootstrap(extensionPath);
+  patchMain(extensionPath);
+  patchWorkbench(extensionPath);
+  await promptRestart();
 }
 
-export function uninstallPatch() {
+export async function uninstallPatch() {
+  disposePatch();
+  const hadPatch = [mainJsBackupPath, workbenchHtmlReplacementPath, iframeIndexBkpPath, patchPath, modulesPath].some(file => fs.existsSync(file));
   restoreMain();
   restoreWorkbench();
   restoreIframe();
-  promptRestart();
+  if (hadPatch) { await promptRestart(); }
 }
