@@ -2,20 +2,20 @@ import * as vscode from 'vscode';
 
 import { applyButtons, disposeButtons } from './buttons/button';
 import * as customizations from './customizations.json';
-import { ensurePatch, uninstallPatch, install, appendIframeStyles, disposePatch } from './patch';
+import { ensurePatch, uninstallPatch, install, appendIframeStyles, disposePatch, updateImports } from './patch';
 import { promptRestart } from './utils';
 
-function changeTheme(context: vscode.ExtensionContext) {
+async function changeTheme() {
   const config = vscode.workspace.getConfiguration();
   const apcTheme = config.get<Array<{ color: string; tokens: string[]; }>>('apc.theme');
-  const colorCustomizations = config.get<any>('workbench.colorCustomizations');
+  const colorCustomizations = config.get<any>('workbench.colorCustomizations') || {};
   const customeTheme = apcTheme || customizations.theme;
   customeTheme.forEach(({ color, tokens }) => {
     tokens.forEach(token => {
       colorCustomizations[token] = color;
     });
   });
-  config.update('workbench.colorCustomizations', colorCustomizations, true);
+  await config.update('workbench.colorCustomizations', colorCustomizations, true);
 }
 
 function reportError(error: unknown) {
@@ -53,8 +53,9 @@ export async function activate(context: vscode.ExtensionContext) {
   async function onDidChangeConfiguration(e: vscode.ConfigurationChangeEvent) {
     if (!isRunning || context.globalState.get('isEnabled') !== true) { return; }
     try {
-      e.affectsConfiguration('apc.theme') && changeTheme(context);
+      if (e.affectsConfiguration('apc.theme')) { await changeTheme(); }
       e.affectsConfiguration('apc.buttons') && applyButtons(context);
+      if (e.affectsConfiguration('apc.imports') || e.affectsConfiguration('apc.stylesheet')) { await updateImports(context); }
       if (e.affectsConfiguration('apc.iframe.style')) { await appendIframeStyles(); }
       if (e.affectsConfiguration('apc.electron') || e.affectsConfiguration('apc.menubar.compact')) { await promptRestart(); }
     } catch (error) { reportError(error); }

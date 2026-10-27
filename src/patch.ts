@@ -3,6 +3,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 // import * as os from 'os';
 import { getConfiguration, getStyleFromFile, getStyles, promptRestart } from './utils';
+import { modernLayout, installModern, uninstallModern, disposeModern, updateModernImports } from './modern';
 
 const bkpName = '.apc.extension.backup';
 const bootstrapName = 'bootstrap-amd.js';
@@ -57,10 +58,13 @@ let fileWatcher: fs.FSWatcher | undefined;
 export function disposePatch() {
   fileWatcher?.close();
   fileWatcher = undefined;
+  disposeModern();
 }
 
 export async function appendIframeStyles() {
-  disposePatch();
+  if (modernLayout()) { return; } // Webview modifications remain a legacy feature.
+  fileWatcher?.close();
+  fileWatcher = undefined;
   const iframeStyle = getIframeConfig();
   if (iframeStyle) {
     if (!fs.existsSync(iframeIndexBkpPath)) { fs.renameSync(iframeIndexPath, iframeIndexBkpPath); }
@@ -90,6 +94,7 @@ function assertLegacyLayout() {
 }
 
 export async function ensurePatch(context: vscode.ExtensionContext) {
+  if (modernLayout()) { installModern(context); return; }
   assertLegacyLayout();
   if (
     !fs.readFileSync(mainJsPath, 'utf8')?.includes('require("./bootstrap-amd")') ||
@@ -239,6 +244,7 @@ function restoreWorkbench() {
 }
 
 export async function install(context: vscode.ExtensionContext) {
+  if (modernLayout()) { installModern(context); return; }
   assertLegacyLayout();
   const extensionPath = context.extensionPath;
   patchBootstrap(extensionPath);
@@ -248,10 +254,15 @@ export async function install(context: vscode.ExtensionContext) {
 }
 
 export async function uninstallPatch() {
+  if (uninstallModern()) { disposePatch(); return; }
   disposePatch();
   const hadPatch = [mainJsBackupPath, workbenchHtmlReplacementPath, iframeIndexBkpPath, patchPath, modulesPath].some(file => fs.existsSync(file));
   restoreMain();
   restoreWorkbench();
   restoreIframe();
   if (hadPatch) { await promptRestart(); }
+}
+
+export async function updateImports(context: vscode.ExtensionContext) {
+  if (modernLayout()) { updateModernImports(context); }
 }

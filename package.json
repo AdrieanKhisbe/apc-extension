@@ -168,7 +168,7 @@
         },
         "apc.imports": {
           "type": "array",
-          "description": "Css files are watched in real time, no need to restart the application",
+          "description": "Local CSS and JS files are watched. Reload the window to undo JavaScript effects.",
           "items": {
             "type": [
               "string",
@@ -443,7 +443,7 @@
     "vscode:prepublish": "npm run compile",
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
-    "pretest": "npm run compile && npm run lint && node --test test/lifecycle.test.js",
+    "pretest": "npm run compile && npm run lint && node --test test/lifecycle.test.js test/modern.test.js",
     "lint": "eslint src --ext ts",
     "test": "node ./test/runTest.js"
   },
