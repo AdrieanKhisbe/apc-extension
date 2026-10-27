@@ -5,6 +5,8 @@ node_modules/**
 src/**
 test/**
 .github/**
+HANDOFF.md
+PLAN.md
 .gitignore
 .yarnrc
 webpack.config.js

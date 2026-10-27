@@ -1,4 +1,4 @@
-name: VS Code activation
+name: VS Code compatibility
 
 on:
   push:
@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   activation:
-    name: Activation / VS Code ${{ matrix.vscode }}
+    name: Imports and restoration / VS Code ${{ matrix.vscode }}
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     strategy:
@@ -26,7 +26,7 @@ jobs:
           node-version: '22'
           cache: npm
       - run: npm ci
-      - name: Compile, lint, and reproduce activation in a real VS Code
+      - name: Compile, lint, and verify activation, imports, and restoration
         run: xvfb-run -a npm test
       - name: Upload extension host logs
         if: always()

@@ -26,12 +26,59 @@ isolated user data and extensions. APC is enabled normally and the test executes
 Use `VSCODE_VERSION=stable npm test` to test the latest stable release. On Linux,
 run `xvfb-run -a npm test` to provide a display.
 
-The GitHub Actions activation workflow tests both 1.140.0 and latest stable,
-and uploads editor logs even when a test fails. Focused lifecycle regressions
-run before the real-editor test. Activation now survives unsupported application
-layouts; the end-to-end enable test still fails explicitly until the modern
-patcher is implemented. Failures are not suppressed. Passing this test proves
-activation and command execution, not CSS/JS import or layout compatibility.
+The GitHub Actions workflow tests both 1.140.0 and latest stable and uploads
+editor logs even when a test fails. Focused lifecycle and patch-transaction
+regressions run before real-editor tests. Those tests verify activation, CSS/JS
+imports in the actual workbench, live updates, reopening, repeated enable,
+disable, and startup after restoration. Application HTML and `main.js` are
+compared against their original bytes. All patching uses the downloaded editor.
+
+## Modern VS Code compatibility
+
+The modern port restores imports through a separate workbench renderer script.
+It preserves VS Code's existing startup script and CSP, adds a narrowly scoped
+Trusted Types policy for configured script URLs, and does not replace its main
+process or bootstrap files. It detects module-based workbench layouts under
+`electron-browser` and `electron-sandbox`; unknown layouts fail before patching.
+The first activation fix alone did not restore these customizations.
+
+| Feature | Modern port status |
+| --- | --- |
+| Local `.css`/`.js` imports | Absolute paths, `file://` URLs, and `${userHome}` supported |
+| Import objects with `href`/`src` | Local sources and HTTP(S) sources supported; explicitly configured external origins are added to the relevant CSP directives |
+| `apc.stylesheet` | Supported, including live configuration changes |
+| Live local file updates | Supported, including atomic saves; renderer checks published changes about once per second |
+| `apc.buttons`, `apc.theme` | Existing public extension API implementations retained |
+| Font, row, header, activity/status bar layout overrides | Legacy AMD/internal-service implementations have not been ported |
+| `apc.electron`, compact menubar, iframe styling | Not implemented by the modern import path |
+
+After enabling APC for the first time, **reload the window** to load its renderer
+script. Configuration and local file edits then update imports without another
+reload. New external origins require a reload because CSP is set at window
+startup. Nested external resources (such as fonts referenced by a remote CSS
+file) remain subject to the rest of VS Code's CSP. Remote imports are not watched.
+
+JavaScript runs as a classic browser script, preserving its global scope.
+Unchanged scripts run once per window, so CSS edits do not redeclare their
+top-level variables. Editing a script runs its new contents; scripts must manage
+their own observers, listeners, and repeated initialization. Reload after changing
+scripts with top-level `const`/`let`, or after removing/disabling scripts whose
+effects need to be undone. Removing a script element cannot undo arbitrary code.
+Import errors identify the source in Developer Tools; unreadable local files and
+patching failures also produce extension notifications.
+
+Patches and the published configuration snapshot are application-wide. Use one
+local profile's APC configuration at a time; different simultaneous profiles do
+not have independent renderer snapshots. Other platforms and older layouts need
+their own validation; do not infer full APC feature parity from import support.
+
+The original HTML is backed up with its checksum, VS Code version, and workbench
+build hash. Partial installation failures roll back. Disable restores the original
+HTML and removes generated files; reload afterward to unload the renderer and
+JavaScript effects. If the editor was independently modified, the backup is
+corrupt, or its build changed, APC refuses to overwrite it with an old backup.
+Use a clean editor installation in that case. A lock left after an editor crash
+is reported with its path and must be cleared before another patch operation.
 
 ## Getting Started
 
