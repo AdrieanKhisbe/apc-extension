@@ -6,6 +6,9 @@ import { createHash, randomBytes } from 'crypto';
 import { fileURLToPath } from 'url';
 import { getConfiguration, getStyles } from './utils';
 
+// Modern counterpart to patch.ts's patchWorkbench/install/restoreWorkbench.
+// Import execution from vs/modules/ui.js lives in resources/modern-loader.js;
+// the remaining AMD service/layout overrides are intentionally separate.
 const directoryName = 'apc-extension';
 const marker = '<!-- APC modern imports -->';
 const policyName = 'apcImports';

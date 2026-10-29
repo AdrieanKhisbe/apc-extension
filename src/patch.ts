@@ -86,10 +86,13 @@ function restoreIframe() {
 }
 
 function assertLegacyLayout() {
+  // The original AMD patcher needs bootstrap-amd.js, the electron-sandbox
+  // workbench HTML, and a recognizable bootstrap call in main.js. This is a
+  // capability check, not a guessed VS Code version cutoff.
   const main = fs.existsSync(mainJsPath) ? fs.readFileSync(mainJsPath, 'utf8') : '';
   if (!fs.existsSync(bootstrapPath) || !fs.existsSync(workbenchHtmlPath) ||
       (!main.includes('require_bootstrap_amd()') && !main.includes('require("./bootstrap-amd")'))) {
-    throw new Error(`VS Code ${vscode.version} is not supported by APC's legacy AMD patcher. Modern workbench support is not yet implemented; no patch files were written.`);
+    throw new Error(`VS Code ${vscode.version} is not supported: neither a module-based workbench nor the AMD bootstrap required by APC's legacy patcher was found; no patch files were written.`);
   }
 }
 

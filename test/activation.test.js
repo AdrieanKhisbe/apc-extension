@@ -1,6 +1,8 @@
 const assert = require('node:assert/strict');
 const vscode = require('vscode');
 
+// VS Code awaits this exported runner in its extension host. The ordered
+// application launches live in runTest.js; standalone regressions use node:test.
 exports.run = async function () {
   console.log(`Activation regression: VS Code ${vscode.version}, ${process.platform}/${process.arch}`);
   const extension = vscode.extensions.getExtension('drcika.apc-extension');
