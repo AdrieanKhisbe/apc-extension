@@ -1,4 +1,6 @@
 // Runs in the workbench renderer. No VS Code internals, AMD, or Node access.
+// Shipped verbatim as a browser ES module: src/ compiles to CommonJS for the
+// extension host, which does not support import.meta or include browser DOM types.
 const key = '__apcModernImports';
 if (!globalThis[key]) {
   const root = new URL('.', import.meta.url);

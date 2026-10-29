@@ -55,7 +55,7 @@ function harness(options = {}) {
   const patchStub = {
     ensurePatch: async () => {}, install: async () => {},
     uninstallPatch: async () => {}, appendIframeStyles: async () => {},
-    disposePatch: () => {}, ...patch,
+    disposePatch: () => {}, updateImports: async () => {}, ...patch,
   };
   return {
     commands, errors, state, context,
@@ -63,7 +63,7 @@ function harness(options = {}) {
       './patch': patchStub, './utils': { promptRestart() {} },
     }),
     realPatch: () => load(path.resolve(__dirname, '../dist/patch.js')),
-    changeConfiguration: () => configurationListener({ affectsConfiguration: key => key === 'apc.iframe.style' }),
+    changeConfiguration: (setting = 'apc.iframe.style') => configurationListener({ affectsConfiguration: key => key === setting }),
   };
 }
 
@@ -139,4 +139,28 @@ test('failed removal does not save a disabled state', async () => {
   await assert.rejects(() => h.commands.get('apc.extension.disable')(), /removal failed/);
   assert.equal(h.state.get('isEnabled'), true);
   assert.match(h.errors.join('\n'), /removal failed/);
+});
+
+test('import and stylesheet configuration updates await publication and report failures', async () => {
+  for (const setting of ['apc.imports', 'apc.stylesheet']) {
+    let rejectUpdate;
+    let updateCalls = 0;
+    const h = harness({ patch: { updateImports: () => {
+      updateCalls++;
+      return new Promise((resolve, reject) => { rejectUpdate = reject; });
+    } } });
+    await h.extension().activate(h.context);
+    await h.changeConfiguration(setting);
+    assert.equal(updateCalls, 0, 'Disabled APC must not publish import changes');
+    await h.commands.get('apc.extension.enable')();
+    let finished = false;
+    const update = h.changeConfiguration(setting).then(() => { finished = true; });
+    await Promise.resolve();
+    assert.equal(updateCalls, 1);
+    assert.equal(finished, false, 'Configuration handler must await the publication');
+    rejectUpdate(new Error(`Cannot publish ${setting}`));
+    await update;
+    assert.equal(h.errors.at(-1), `Apc Extension failed: Cannot publish ${setting}`);
+    assert.equal(h.state.get('isEnabled'), true, 'A failed update must not change enabled state');
+  }
 });

@@ -62,6 +62,8 @@ function addButton(context: vscode.ExtensionContext, button: ButtonConfig) {
 let buttons: Array<vscode.StatusBarItem> | undefined = undefined;
 
 export function disposeButtons() {
+  // Shared by rebuild, disable, and extension disposal so commands and SCM
+  // listeners are released together with their status bar items.
   if (buttons) { buttons.forEach(button => button.dispose()); }
   buttons = undefined;
   subscriptions.forEach(subs => subs.dispose());
