@@ -3,6 +3,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 // import * as os from 'os';
 import { getConfiguration, getStyleFromFile, getStyles, promptRestart } from './utils';
+import { modernLayout, installModern, uninstallModern, disposeModern, updateModernImports } from './modern';
 
 const bkpName = '.apc.extension.backup';
 const bootstrapName = 'bootstrap-amd.js';
@@ -13,7 +14,7 @@ const mainProcessJsName = 'process.main.js';
 const workbenchHtmlName = 'workbench.html';
 const browserMain = 'browser.main.js';
 
-const installationPath = path.dirname(require.main!.filename);
+const installationPath = path.join(vscode.env.appRoot, 'out');
 const bootstrapPath = path.join(installationPath, bootstrapName);
 const bootstrapBackupPath = bootstrapPath + bkpName;
 const mainJsPath = path.join(installationPath, mainJsName);
@@ -47,37 +48,57 @@ function appendIframeStyle(iframeStyle: Record<string, string> | string) {
     .replace('meta http-equiv="Content-Security-Policy"', 'meta http-equiv=""')
     .replace('blockquote {', `${style}\n\t\t\tblockquote {`);
 
-  fs.writeFile(iframeIndexPath, iframeIndex, 'utf8', () => { });
+  fs.writeFileSync(iframeIndexPath, iframeIndex, 'utf8');
 }
 
 function getIframeConfig() {
   return getConfiguration<Record<string, string> | string>('apc.iframe.style') || '';
 }
 let fileWatcher: fs.FSWatcher | undefined;
+export function disposePatch() {
+  fileWatcher?.close();
+  fileWatcher = undefined;
+  disposeModern();
+}
+
 export async function appendIframeStyles() {
-  try {
-    fileWatcher?.close?.();
-    const iframeStyle = getIframeConfig();
-    if (iframeStyle) {
-      if (!fs.existsSync(iframeIndexBkpPath)) { fs.renameSync(iframeIndexPath, iframeIndexBkpPath); }
+  if (modernLayout()) { return; } // Webview modifications remain a legacy feature.
+  fileWatcher?.close();
+  fileWatcher = undefined;
+  const iframeStyle = getIframeConfig();
+  if (iframeStyle) {
+    if (!fs.existsSync(iframeIndexBkpPath)) { fs.renameSync(iframeIndexPath, iframeIndexBkpPath); }
 
-      appendIframeStyle(iframeStyle);
+    appendIframeStyle(iframeStyle);
 
-      fileWatcher = typeof iframeStyle === 'string' ? fs.watch(iframeStyle, 'utf8', () => appendIframeStyle(getIframeConfig())) : undefined;
-    }
-    else { restoreIframe(); };
-  } catch (error) {
-    console.trace(error);
+    fileWatcher = typeof iframeStyle === 'string' ? fs.watch(iframeStyle, 'utf8', () => {
+      try { appendIframeStyle(getIframeConfig()); }
+      catch (error) { void vscode.window.showErrorMessage(`Apc iframe styles failed: ${error}`); }
+    }) : undefined;
   }
+  else { restoreIframe(); }
 }
 
 function restoreIframe() {
   if (fs.existsSync(iframeIndexBkpPath)) {
-    fs.rename(iframeIndexBkpPath, iframeIndexPath, () => { });
+    fs.renameSync(iframeIndexBkpPath, iframeIndexPath);
+  }
+}
+
+function assertLegacyLayout() {
+  // The original AMD patcher needs bootstrap-amd.js, the electron-sandbox
+  // workbench HTML, and a recognizable bootstrap call in main.js. This is a
+  // capability check, not a guessed VS Code version cutoff.
+  const main = fs.existsSync(mainJsPath) ? fs.readFileSync(mainJsPath, 'utf8') : '';
+  if (!fs.existsSync(bootstrapPath) || !fs.existsSync(workbenchHtmlPath) ||
+      (!main.includes('require_bootstrap_amd()') && !main.includes('require("./bootstrap-amd")'))) {
+    throw new Error(`VS Code ${vscode.version} is not supported: neither a module-based workbench nor the AMD bootstrap required by APC's legacy patcher was found; no patch files were written.`);
   }
 }
 
 export async function ensurePatch(context: vscode.ExtensionContext) {
+  if (modernLayout()) { installModern(context); return; }
+  assertLegacyLayout();
   if (
     !fs.readFileSync(mainJsPath, 'utf8')?.includes('require("./bootstrap-amd")') ||
     !fs.existsSync(workbenchHtmlReplacementPath) ||
@@ -158,7 +179,6 @@ function restoreMain() {
     // restore main.js
     fs.renameSync(mainJsBackupPath, mainJsPath);
     // remove bkp file
-    fs.rm(mainJsBackupPath, () => { });
   }
   // remove pached modules
   fs.existsSync(patchPath) && fs.rmSync(patchPath, { recursive: true, force: true });
@@ -223,24 +243,29 @@ function patchWorkbench(extensionPath: string) {
 }
 
 function restoreWorkbench() {
-  fs.existsSync(workbenchHtmlReplacementPath) && fs.rm(workbenchHtmlReplacementPath, () => { });
+  fs.existsSync(workbenchHtmlReplacementPath) && fs.rmSync(workbenchHtmlReplacementPath);
 }
 
 export async function install(context: vscode.ExtensionContext) {
-  try {
-    const extensionPath = context.extensionPath;
-    patchBootstrap(extensionPath);
-    patchMain(extensionPath);
-    patchWorkbench(extensionPath);
-    promptRestart();
-  } catch (e) {
-    vscode.window.showErrorMessage(`Apc Extension failed: ${e}`);
-  }
+  if (modernLayout()) { installModern(context); return; }
+  assertLegacyLayout();
+  const extensionPath = context.extensionPath;
+  patchBootstrap(extensionPath);
+  patchMain(extensionPath);
+  patchWorkbench(extensionPath);
+  await promptRestart();
 }
 
-export function uninstallPatch() {
+export async function uninstallPatch() {
+  if (uninstallModern()) { disposePatch(); return; }
+  disposePatch();
+  const hadPatch = [mainJsBackupPath, workbenchHtmlReplacementPath, iframeIndexBkpPath, patchPath, modulesPath].some(file => fs.existsSync(file));
   restoreMain();
   restoreWorkbench();
   restoreIframe();
-  promptRestart();
+  if (hadPatch) { await promptRestart(); }
+}
+
+export async function updateImports(context: vscode.ExtensionContext) {
+  if (modernLayout()) { updateModernImports(context); }
 }
