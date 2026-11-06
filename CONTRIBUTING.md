@@ -9,7 +9,9 @@ Use Node.js 22 or newer: `npm ci`, then `npm test`. On Linux, use
 release; the default is 1.140.0. CI runs both and uploads editor logs.
 
 The harness downloads a disposable editor and uses isolated profiles/extensions.
-It never patches the installed editor. Compilation, lint and the focused
+It never patches the installed editor. All runners use a test-only Electron
+guard with `showInactive()` and suppressed window/application focus calls, then
+restore the guard in `finally`. Compilation, lint and the focused
 `node:test` regressions run first. Real extension-host runners export an awaited
 `run()` function through VS Code's custom runner interface: install, imports,
 buttons/theme/live status sizing, webview updates, reopen/disable, and independent

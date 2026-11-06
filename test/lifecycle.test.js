@@ -259,6 +259,22 @@ test('failed theme application rolls back installation and keeps enable retryabl
   assert.equal(h.settings.get('workbench.colorCustomizations')['statusBar.background'], '#123456');
 });
 
+test('configuration events during disable cannot queue theme reapplication', async () => {
+  let h; let pending;
+  const original = { 'statusBar.background': '#112233' };
+  h = harness({ initialState: true,
+    settings: new Map([['apc.theme', [{ color: '#abcdef', tokens: ['statusBar.background'] }]], ['workbench.colorCustomizations', original]]),
+    beforeSettingsUpdate: (_key, value) => {
+      if (value?.['statusBar.background'] === '#112233') { pending = h.changeConfiguration('apc.theme'); }
+    },
+  });
+  await h.extension().activate(h.context);
+  await h.commands.get('apc.extension.disable')();
+  await pending;
+  assert.deepEqual(h.settings.get('workbench.colorCustomizations'), original);
+  assert.equal(h.state.get('themeOverrides'), undefined);
+});
+
 test('commands are registered before startup patching finishes', async () => {
   let finish;
   const pending = new Promise(resolve => { finish = resolve; });
@@ -299,13 +315,17 @@ test('configuration listener follows enable and disable in the same session', as
 });
 
 test('failed removal does not save a disabled state', async () => {
+  let updates = 0;
   const h = harness({ initialState: true, patch: {
     uninstallPatch: async () => { throw new Error('removal failed'); },
+    updateImports: async () => { updates++; },
   } });
   await h.extension().activate(h.context);
   await assert.rejects(() => h.commands.get('apc.extension.disable')(), /removal failed/);
   assert.equal(h.state.get('isEnabled'), true);
   assert.match(h.errors.join('\n'), /removal failed/);
+  await h.changeConfiguration();
+  assert.equal(updates, 1, 'Failed disable must reopen the runtime configuration gate');
 });
 
 test('import and stylesheet configuration updates await publication and report failures', async () => {

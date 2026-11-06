@@ -32,6 +32,10 @@ async function apcEnable(context: vscode.ExtensionContext, state: RuntimeState, 
 }
 
 async function apcDisable(context: vscode.ExtensionContext, state: RuntimeState) {
+  const wasRunning = state.isRunning;
+  // Restoration can emit broad configuration events. Close the runtime gate
+  // before awaiting it so those events cannot enqueue a fresh theme application.
+  state.isRunning = false;
   try {
     await uninstallPatch();
     await state.theme.restore();
@@ -39,6 +43,7 @@ async function apcDisable(context: vscode.ExtensionContext, state: RuntimeState)
     state.isRunning = false;
     disposeButtons();
   } catch (error) {
+    state.isRunning = wasRunning;
     reportError(error);
     throw error;
   }
