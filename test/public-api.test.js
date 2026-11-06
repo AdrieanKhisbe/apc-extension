@@ -112,7 +112,7 @@ exports.run = async function () {
     await eventually(async () => (await labels()).includes('APC check disable'), 'Button missing before disable');
     await vscode.commands.executeCommand('apc.extension.disable');
     await eventually(async () => (await labels()).length === 0 && !(await vscode.commands.getCommands(true)).includes(generatedCommand), 'Disable must dispose buttons and generated commands');
-    await eventually(() => JSON.stringify(colors()) === JSON.stringify({ 'editor.background': '#102030' }), 'Disable must restore previous colors before subsequent edits');
+    await eventually(() => { assert.deepEqual(colors(), { 'editor.background': '#102030' }); return true; }, 'Disable must restore previous colors before subsequent edits');
     await update('apc.buttons', [{ text: 'APC check reenable', vscommand: 'apc.test.button' }]);
     await update('apc.theme', [{ color: '#abcdef', tokens: ['statusBar.background'] }]);
     // A configuration read after the next event turn checks disabled-state gating.

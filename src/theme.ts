@@ -40,6 +40,7 @@ async function transition(context: vscode.ExtensionContext, desired: Map<string,
   // Only own global values. Copying the merged configuration here would leak
   // workspace colors into the user's global settings.
   const original = config.inspect<Colors>(colorsKey)?.globalValue;
+  if (process.env.APC_THEME_TRACE) { console.log('APC theme transition:', JSON.stringify({ desired: [...desired], original, saved })); }
   if (original !== undefined && (!original || typeof original !== 'object' || Array.isArray(original))) {
     throw new Error('workbench.colorCustomizations must be an object');
   }
