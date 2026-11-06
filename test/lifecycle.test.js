@@ -47,6 +47,10 @@ function harness(options = {}) {
       onDidChangeWorkspaceFolders: () => disposable,
     },
   };
+  const storage = {
+    read: async () => state.get('themeOverrides'),
+    write: async value => { await options.beforeStateUpdate?.('themeOverrides', value); state.set('themeOverrides', structuredClone(value)); },
+  };
   const cache = new Map();
   function load(filename, overrides = {}) {
     if (cache.has(filename)) { return cache.get(filename).exports; }
@@ -74,9 +78,11 @@ function harness(options = {}) {
     commands, errors, state, settings, context,
     extension: () => load(path.resolve(__dirname, '../dist/extension.js'), {
       './patch': patchStub, './utils': { promptRestart() {} },
+      './theme': { createThemeManager: context => load(path.resolve(__dirname, '../dist/theme.js')).createThemeManager(context, storage) },
     }),
     realPatch: () => load(path.resolve(__dirname, '../dist/patch.js')),
-    theme: () => load(path.resolve(__dirname, '../dist/theme.js')).createThemeManager(context),
+    diskTheme: () => load(path.resolve(__dirname, '../dist/theme.js')).createThemeManager(context),
+    theme: () => load(path.resolve(__dirname, '../dist/theme.js')).createThemeManager(context, storage),
     changeConfiguration: (setting = 'apc.iframe.style') => configurationListener({ affectsConfiguration: key => key === setting }),
   };
 }
@@ -273,6 +279,45 @@ test('configuration events during disable cannot queue theme reapplication', asy
   await pending;
   assert.deepEqual(h.settings.get('workbench.colorCustomizations'), original);
   assert.equal(h.state.get('themeOverrides'), undefined);
+});
+
+test('file-backed ownership survives reopening despite stale Memento snapshots', async () => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'apc-theme-storage-'));
+  const h = harness({ settings: new Map([
+    ['apc.theme', [{ color: '#123456', tokens: ['statusBar.background'] }]],
+    ['workbench.colorCustomizations', { 'statusBar.background': '#112233' }],
+  ]) });
+  h.context.globalStorageUri = { fsPath: directory };
+  try {
+    const theme = h.diskTheme();
+    await theme.apply();
+    const first = fs.readFileSync(path.join(directory, 'theme-overrides.json'), 'utf8');
+    h.settings.set('apc.theme', [{ color: '#654321', tokens: ['statusBar.background'] }]);
+    await theme.apply();
+    h.state.set('themeOverrides', JSON.parse(first)); // delayed external Memento event
+    const journal = JSON.parse(fs.readFileSync(path.join(directory, 'theme-overrides.json'), 'utf8'));
+    assert.equal(journal.tokens['statusBar.background'].applied, '#654321');
+    await h.diskTheme().restore(); // new manager reads the durable journal
+    assert.deepEqual(h.settings.get('workbench.colorCustomizations'), { 'statusBar.background': '#112233' });
+    assert.deepEqual(fs.readdirSync(directory), []);
+  } finally { fs.rmSync(directory, { recursive: true, force: true }); }
+});
+
+test('invalid or unwritable journal files leave user colors untouched', async () => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'apc-theme-storage-'));
+  const h = harness({ settings: new Map([
+    ['apc.theme', [{ color: '#123456', tokens: ['statusBar.background'] }]],
+    ['workbench.colorCustomizations', { 'statusBar.background': '#112233' }],
+  ]) });
+  try {
+    fs.writeFileSync(path.join(directory, 'theme-overrides.json'), '{broken');
+    h.context.globalStorageUri = { fsPath: directory };
+    await assert.rejects(() => h.diskTheme().apply(), /JSON|position|property/i);
+    const blocked = path.join(directory, 'blocked'); fs.writeFileSync(blocked, 'file');
+    h.context.globalStorageUri = { fsPath: blocked };
+    await assert.rejects(() => h.diskTheme().apply(), /ENOTDIR/);
+    assert.deepEqual(h.settings.get('workbench.colorCustomizations'), { 'statusBar.background': '#112233' });
+  } finally { fs.rmSync(directory, { recursive: true, force: true }); }
 });
 
 test('commands are registered before startup patching finishes', async () => {

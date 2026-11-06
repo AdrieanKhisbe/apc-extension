@@ -25,6 +25,8 @@ a temporary repository. `test/buttons.test.js` covers initial counts, repository
 open/close events, delayed Git activation and subscription cleanup.
 `test/lifecycle.test.js` covers theme startup, token removal, reopening with saved
 ownership, manual edits, global/workspace separation and interrupted writes.
+Theme ownership uses an atomic journal in extension storage, independently of
+Memento snapshots; disk-backed tests cover reopening, corruption and I/O errors.
 `test/customizations.test.js` covers all supported font selectors and default
 list delegates, including per-view overrides and special input/action rows;
 the editor suite verifies actual geometry for Explorer.

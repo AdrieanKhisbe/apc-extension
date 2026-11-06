@@ -1,10 +1,33 @@
 import * as vscode from 'vscode';
+import * as fs from 'node:fs/promises';
+import * as path from 'node:path';
+import { randomUUID } from 'node:crypto';
 
 type Colors = Record<string, unknown>;
 type Override = { hadOriginal: boolean; original?: unknown; applied: string; pending?: string };
 type Journal = { version: 1; wasUnset: boolean; tokens: Record<string, Override> };
 export type ThemeManager = { apply(): Promise<void>; restore(): Promise<void> };
-const storageKey = 'themeOverrides';
+export type ThemeStorage = { read(): Promise<unknown>; write(value: Journal | undefined): Promise<void> };
+
+// Memento can replay older whole-extension snapshots after acknowledged writes.
+// Keep ownership independent of that cache and publish each journal atomically.
+function journalStorage(context: vscode.ExtensionContext): ThemeStorage {
+  const directory = context.globalStorageUri.fsPath;
+  const file = path.join(directory, 'theme-overrides.json');
+  return {
+    async read() {
+      try { return JSON.parse(await fs.readFile(file, 'utf8')); }
+      catch (error) { if ((error as NodeJS.ErrnoException).code === 'ENOENT') { return; } throw error; }
+    },
+    async write(value) {
+      if (value === undefined) { await fs.rm(file, { force: true }); return; }
+      await fs.mkdir(directory, { recursive: true });
+      const temporary = `${file}.${randomUUID()}.tmp`;
+      try { await fs.writeFile(temporary, JSON.stringify(value), { mode: 0o600 }); await fs.rename(temporary, file); }
+      finally { await fs.rm(temporary, { force: true }); }
+    },
+  };
+}
 const colorsKey = 'workbench.colorCustomizations';
 const has = (value: object, key: string) => Object.prototype.hasOwnProperty.call(value, key);
 const validToken = (token: unknown): token is string => typeof token === 'string' && !!token.trim() && !['__proto__', 'constructor', 'prototype'].includes(token);
@@ -23,8 +46,8 @@ function desiredColors(): Map<string, string> {
   return colors;
 }
 
-function readJournal(context: vscode.ExtensionContext): Journal | undefined {
-  const saved = context.globalState.get<Journal>(storageKey);
+async function readJournal(storage: ThemeStorage): Promise<Journal | undefined> {
+  const saved = await storage.read() as Journal | undefined;
   if (!saved) { return; }
   if (saved.version !== 1 || typeof saved.wasUnset !== 'boolean' || !saved.tokens || typeof saved.tokens !== 'object' || Array.isArray(saved.tokens) ||
       Object.entries(saved.tokens).some(([token, record]) => !validToken(token) || !record || typeof record.hadOriginal !== 'boolean' || typeof record.applied !== 'string' || (record.pending !== undefined && typeof record.pending !== 'string'))) {
@@ -33,8 +56,8 @@ function readJournal(context: vscode.ExtensionContext): Journal | undefined {
   return saved;
 }
 
-async function transition(context: vscode.ExtensionContext, desired: Map<string, string>) {
-  const saved = readJournal(context);
+async function transition(storage: ThemeStorage, desired: Map<string, string>) {
+  const saved = await readJournal(storage);
   if (!desired.size && !Object.keys(saved?.tokens ?? {}).length) { return; }
   const config = vscode.workspace.getConfiguration();
   // Only own global values. Copying the merged configuration here would leak
@@ -73,14 +96,14 @@ async function transition(context: vscode.ExtensionContext, desired: Map<string,
 
   // Persist ownership before settings. Keeping both the previous and pending
   // color lets the next operation recover either side of an interrupted write.
-  await context.globalState.update(storageKey, { version: 1, wasUnset, tokens: staged } satisfies Journal);
+  await storage.write({ version: 1, wasUnset, tokens: staged } satisfies Journal);
   if (changed) {
     await config.update(colorsKey, !Object.keys(colors).length && wasUnset ? undefined : colors, vscode.ConfigurationTarget.Global);
   }
-  await context.globalState.update(storageKey, Object.keys(committed).length ? { version: 1, wasUnset, tokens: committed } satisfies Journal : undefined);
+  await storage.write(Object.keys(committed).length ? { version: 1, wasUnset, tokens: committed } satisfies Journal : undefined);
 }
 
-export function createThemeManager(context: vscode.ExtensionContext): ThemeManager {
+export function createThemeManager(context: vscode.ExtensionContext, storage: ThemeStorage = journalStorage(context)): ThemeManager {
   let tail = Promise.resolve();
   function enqueue(operation: () => Promise<void>) {
     const result = tail.then(operation);
@@ -88,7 +111,7 @@ export function createThemeManager(context: vscode.ExtensionContext): ThemeManag
     return result;
   }
   return {
-    apply: () => enqueue(() => transition(context, desiredColors())),
-    restore: () => enqueue(() => transition(context, new Map())),
+    apply: () => enqueue(() => transition(storage, desiredColors())),
+    restore: () => enqueue(() => transition(storage, new Map())),
   };
 }
