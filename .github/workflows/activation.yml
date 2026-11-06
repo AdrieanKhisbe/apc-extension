@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   activation:
-    name: Imports and restoration / VS Code ${{ matrix.vscode }}
+    name: Imports, buttons, theme and restoration / VS Code ${{ matrix.vscode }}
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     strategy:
@@ -26,7 +26,7 @@ jobs:
           node-version: '22'
           cache: npm
       - run: npm ci
-      - name: Compile, lint, and verify activation, imports, and restoration
+      - name: Compile, lint, and verify activation, imports, buttons, theme, and restoration
         run: xvfb-run -a npm test
       - name: Upload extension host logs
         if: always()

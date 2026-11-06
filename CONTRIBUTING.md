@@ -17,15 +17,22 @@ The GitHub Actions workflow tests both 1.140.0 and latest stable and uploads
 editor logs even when a test fails. Focused lifecycle and patch-transaction
 regressions run before real-editor tests. Those tests verify activation, CSS/JS
 imports in the actual workbench, live updates, reopening, repeated enable,
-disable, and startup after restoration. Application HTML and `main.js` are
-compared against their original bytes. All patching uses the downloaded editor.
+buttons and live theme colors, disable, and startup after restoration. Application
+HTML and `main.js` are compared against their original bytes. All patching uses
+the downloaded editor.
 
 `test/lifecycle.test.js` and `test/modern.test.js` use `node:test` in a normal Node
-process. The four real-editor suites export an awaited `run()` function, following
+process. The five real-editor suites export an awaited `run()` function, following
 VS Code's [custom test runner interface](https://code.visualstudio.com/api/working-with-extensions/testing-extension#the-test-runner-script).
 They run sequentially in separate editor launches because patching takes effect
-on the next startup: activate/install, exercise imports, reopen/disable, and check
-restored startup. Plain `node --test` cannot provide the real `vscode` module;
+on the next startup: activate/install, exercise imports, exercise public-API
+buttons/theme behavior, reopen/disable, and check restored startup.
+`test/public-api.test.js` checks startup/live button rendering, priority, command
+clicks, actual shell execution in an isolated terminal profile, cleanup on removal
+and disable, re-enable, and live color-token updates without losing unrelated
+user colors. SCM counts, initial theme application, and theme-token removal are
+outside that suite's coverage. Plain `node --test` cannot provide the real
+`vscode` module;
 using `node:test` inside the extension host would require an in-process runner
 that forwards failures to this `run()` promise. The current runners use strict
 assertions and rejected promises for that contract.

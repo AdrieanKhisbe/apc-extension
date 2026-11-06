@@ -23,15 +23,24 @@ updates. The table below shows which other customizations are available.
 Compatibility is tested on VS Code 1.140.0 and the latest stable release;
 older versions have not been validated by the current test matrix.
 
-| Feature | Modern port status |
-| --- | --- |
-| Local `.css`/`.js` imports | Absolute paths, `file://` URLs, and `${userHome}` supported |
-| Import objects with `href`/`src` | Local sources and HTTP(S) sources supported; explicitly configured external origins are added to the relevant CSP directives |
-| `apc.stylesheet` | Supported, including live configuration changes |
-| Live local file updates | Supported, including atomic saves; renderer checks published changes about once per second |
-| `apc.buttons`, `apc.theme` | Existing public extension API implementations retained |
-| Font, row, header, activity/status bar layout overrides | Legacy AMD/internal-service implementations have not been ported |
-| `apc.electron`, compact menubar, iframe styling | Not implemented by the modern import path |
+| Feature | Implemented | Tested |
+| --- | --- | --- |
+| Activation, enable/disable, restoration | ✅ Modern editor lifecycle and reversible patching | ✅ Automated lifecycle and real-editor checks |
+| Local `.css`/`.js` imports | ✅ Absolute paths, `file://`, `${userHome}`, import objects | ✅ Automated publication and real-editor imports |
+| HTTP(S) import objects | ✅ Configured script/style origins | ✅ Real-editor loading under CSP |
+| `apc.stylesheet` | ✅ Live configuration updates | ✅ Real-editor changes and removal |
+| Live local file updates | ✅ Including atomic saves | ✅ Real-editor CSS/JS updates and unchanged-script deduplication |
+| `apc.buttons` | ✅ Status-bar commands and terminal buttons | 🟡 Automated startup, clicks, updates, priority, terminal execution, cleanup and re-enable; SCM counts untested |
+| `apc.theme` | 🟡 Applies color tokens on configuration changes | 🟡 Automated live colors, preservation and disabled-state gating; startup/removal not covered |
+| Font overrides | ❌ Not ported | 🧪 Selected font styling demonstrated in prototype |
+| List row/header dimensions | ❌ Not ported | 🧪 Explorer measurement hook works; CSS-only rows/headers have geometry errors |
+| Activity/status bar layout | ❌ APC overrides not ported | 🧪 Built-in placement checked; custom CSS sizing/placement has geometry errors |
+| `apc.electron`, compact menubar | ❌ Not ported | ❌ Runtime unverified; source investigation only |
+| Iframe/webview styling | ❌ Not ported | 🧪 Privileged template injection demonstrated on fixture webviews |
+
+✅ = implemented or automated checks passed for the stated scope; 🟡 = partial;
+🧪 = separate prototype evidence, not integrated feature coverage; ❌ = unavailable
+or unverified. Prototype findings are limited to VS Code 1.143.1 on macOS ARM64.
 
 After enabling APC for the first time, **reload the window** to load its renderer
 script. Configuration and local file edits then update imports without another

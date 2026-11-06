@@ -54,14 +54,17 @@ async function main() {
   fs.mkdirSync(driver);
   fs.writeFileSync(path.join(driver, 'package.json'), JSON.stringify({ name: 'apc-restoration-test', publisher: 'apc-tests', version: '0.0.0', engines: { vscode: '^1.92.0' } }));
   fs.mkdirSync(path.join(profile, 'user-data/User'), { recursive: true });
-  fs.writeFileSync(path.join(profile, 'user-data/User/settings.json'), JSON.stringify({ 'apc.imports': imports }));
+  fs.writeFileSync(path.join(profile, 'user-data/User/settings.json'), JSON.stringify({
+    'apc.imports': imports,
+    'apc.buttons': [{ text: 'APC check startup', vscommand: 'apc.test.button' }],
+  }));
   const server = net.createServer();
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
   const port = server.address().port;
   await new Promise(resolve => server.close(resolve));
   console.log(`Testing VS Code ${version}; isolated data: ${profile}`);
   try {
-    for (const suite of ['activation.test.js', 'imports.test.js', 'reload.test.js', 'disabled.test.js']) {
+    for (const suite of ['activation.test.js', 'imports.test.js', 'public-api.test.js', 'reload.test.js', 'disabled.test.js']) {
       console.log(`Running real-editor suite: ${suite}`);
       await runTests({
         vscodeExecutablePath,
