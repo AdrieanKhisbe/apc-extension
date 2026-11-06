@@ -17,7 +17,7 @@ Module._load = function (name, ...args) {
 const { prepareCustomizations, customizationStyles } = require('../dist/customizations');
 Module._load = originalLoad;
 const context = { extensionPath: path.resolve(__dirname, '..') };
-const fixture = 'class A{constructor(a,b,c,d=Opts){this.virtualDelegate=b;this.domId=`list_id_${1}`;}get tabHeight(){let a=this.groupsView.partOptions.tabHeight;return a==="compact"?22:35}getHoverTitle(){}};this.workbenchGrid=a,this.workbenchGrid.edgeSnapping=false;function layout(a,b){let c;if(this.options.hasTitle){let d=35;c=new D(a,Math.min(b,d))}else c=D.None;let e;if(this.headerVisible){}}';
+const fixture = 'class A{constructor(a,b,c,d=Opts){this.virtualDelegate=b;this.domId=`list_id_${1}`;}get tabHeight(){let a=this.groupsView.partOptions.tabHeight;return a==="compact"?22:35}getHoverTitle(){}};this.workbenchGrid=a,this.workbenchGrid.edgeSnapping=false;const options={partContainerClass:"activitybar",orientation:1,icon:true};this._orientation=this.options.orientation??0,this.foo=1;function layout(a,b){let c;if(this.options.hasTitle){let d=35;c=new D(a,Math.min(b,d))}else c=D.None;let e;if(this.headerVisible){}}';
 test.after(() => fs.rmSync(directory, { recursive: true, force: true }));
 test('empty settings do not read or require an application bundle', () => {
   settings = {};

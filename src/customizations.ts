@@ -13,7 +13,7 @@ export function customizationConfiguration(): Settings {
     if (settings === undefined) { continue; }
     if (!settings || typeof settings !== 'object' || Array.isArray(settings)) { throw new Error(`apc.${key} must be an object`); }
     for (const property of ['height', 'fontSize', 'size', 'itemSize', 'input', 'actionButton', 'default', 'compact']) { positive(settings[property]); }
-    if (settings.itemMargin !== undefined && (typeof settings.itemMargin !== 'number' || !Number.isFinite(settings.itemMargin) || settings.itemMargin < 0 || settings.itemMargin > 512)) { throw new Error('APC item margin must be a finite number from 0 to 512'); }
+    if (settings.itemMargin !== undefined && (typeof settings.itemMargin !== 'number' || !Number.isFinite(settings.itemMargin) || settings.itemMargin < 0)) { throw new Error('APC item margin must be a non-negative finite number'); }
   }
   const status = values.statusBar as Record<string, unknown> | undefined;
   if (status?.position !== undefined && !['bottom', 'top', 'editor-top', 'editor-bottom'].includes(String(status.position))) { throw new Error('Unknown APC status bar position'); }
@@ -44,6 +44,10 @@ export function prepareCustomizations(context: vscode.ExtensionContext, original
     (full, container, delegate) => full.replace(`this.virtualDelegate=${delegate};`, `${delegate}=globalThis.__apcCustomizations.list(this,${container},${delegate});this.virtualDelegate=${delegate};`), 'virtualized list');
   source = replaceOne(source, /this\.workbenchGrid=([$\w]+),this\.workbenchGrid\.edgeSnapping=/,
     (full, grid) => `this.workbenchGrid=${grid},globalThis.__apcCustomizations.layout(this),this.workbenchGrid.edgeSnapping=`, 'workbench grid');
+  source = replaceOne(source, /(partContainerClass:"activitybar",[^}]*?orientation:)1,/,
+    (full, prefix) => `${prefix}globalThis.__apcCustomizations.activityOrientation(),`, 'activity composite orientation');
+  source = replaceOne(source, /this\._orientation=this\.options\.orientation\?\?0,/,
+    () => 'this._orientation=globalThis.__apcCustomizations.actionOrientation(arguments[0],this.options.orientation??0),', 'action-bar keyboard orientation');
   source = replaceOne(source, /;([$\w]+)=new ([$\w]+)\(([$\w]+),Math\.min\(([$\w]+),([$\w]+)\)\)\}else \1=\2\.None;let ([$\w]+);if\(this\.headerVisible\)/,
     (full, title, dimension, width, height, value, next) => `;${value}=globalThis.__apcCustomizations.header(this,${value});${title}=new ${dimension}(${width},Math.min(${height},${value}))}else ${title}=${dimension}.None;let ${next};if(this.headerVisible)`, 'part title measurement');
   source = replaceOne(source, /get tabHeight\(\)\{([\s\S]*?)\}getHoverTitle\(/,
@@ -63,7 +67,7 @@ function family(value: unknown): string | undefined {
 
 function positive(value: unknown): number | undefined {
   if (value === undefined) { return; }
-  if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0 || value > 512) { throw new Error('APC dimensions must be positive finite numbers up to 512'); }
+  if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) { throw new Error('APC dimensions must be positive finite numbers'); }
   return value;
 }
 
@@ -84,7 +88,7 @@ export function customizationStyles(): string {
     const value = config[key] as Record<string, unknown> | undefined;
     const size = positive(value?.fontSize);
     if (size) {
-      const selector = key === 'statusBar' ? '.part.statusbar' : key === 'header' ? '.editor-group-container > .title' : '.part.sidebar > .title,.part.auxiliarybar > .title,.part.panel > .title';
+      const selector = key === 'statusBar' ? '.part.statusbar' : key === 'header' ? '.editor-group-container > .title,.editor-group-container > .title .label-name' : '.part.sidebar > .title,.part.sidebar > .title h2,.part.auxiliarybar > .title,.part.auxiliarybar > .title .action-label:not(.codicon),.part.panel > .title,.part.panel > .title .action-label:not(.codicon)';
       rules.push(`${selector}{font-size:${size}px !important}`);
     }
   }
