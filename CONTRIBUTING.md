@@ -58,21 +58,22 @@ in CommonJS; it replaces the assumptions about the application's internals:
 5. Record backups/checksums and roll back failed writes; verify actual workbench
    behavior and exact restoration in disposable editor installations.
 
-`src/modern.ts` is the module-based counterpart of the installation, workbench
-patching, and restoration functions in `src/patch.ts`. Compare its import
-preparation with `appendFiles`/`appendStyles` in `vs/modules/ui.js`; execution now
-lives in `resources/modern-loader.js`. That resource is shipped verbatim as a
-browser ES module. Putting it through the existing `src` compiler would target
-CommonJS without DOM types; moving it there would need a separate browser build.
-The legacy `vs/modules/main.js` and `patch.js` also load private service/layout
-overrides, which the new import loader does not implement.
+`src/patch.ts` owns layout detection, import publication, application locking,
+transactional installation and restoration. `resources/modern-loader.js` runs
+the imports in the browser. It is shipped verbatim because the extension-host
+compiler targets CommonJS without DOM types.
 
-Here, **legacy layout** means the original AMD installation: `bootstrap-amd.js`,
-`electron-sandbox/workbench/workbench.html`, and an expected AMD bootstrap call in
-`out/main.js`. `assertLegacyLayout()` checks those concrete anchors after modern
-layout detection fails. The original AMD implementation is retained, but it has
-not been validated by the current CI matrix. Retention is not a guarantee of
-older-version support.
+The untested AMD fallback and its bundled runtime have been removed. Older
+editors that lack module-based workbench startup are rejected before writes.
+The previous implementation remains available in Git history for comparison.
+
+### Patch recovery
+
+Backups are checked against the editor version, workbench build, and original
+file hashes. APC refuses to restore a corrupt backup or overwrite files changed
+outside APC. Use a clean editor installation if the application build or backup
+has changed. A reported lock left after a crash can be removed after confirming
+that no other editor process is patching that installation.
 
 ## Work required for the remaining customizations
 

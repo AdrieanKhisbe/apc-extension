@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 
 import { applyButtons, disposeButtons } from './buttons/button';
 import * as customizations from './customizations.json';
-import { ensurePatch, uninstallPatch, install, appendIframeStyles, disposePatch, updateImports } from './patch';
+import { ensurePatch, uninstallPatch, install, disposePatch, updateImports } from './patch';
 import { promptRestart } from './utils';
 
 async function changeTheme() {
@@ -23,46 +23,51 @@ function reportError(error: unknown) {
   void vscode.window.showErrorMessage(`Apc Extension failed: ${message}`);
 }
 
+type RuntimeState = { isRunning: boolean };
+
+async function apcEnable(context: vscode.ExtensionContext, state: RuntimeState) {
+  try {
+    await install(context);
+    await context.globalState.update('isEnabled', true);
+    state.isRunning = true;
+    applyButtons(context);
+  } catch (error) {
+    reportError(error);
+    throw error;
+  }
+}
+
+async function apcDisable(context: vscode.ExtensionContext, state: RuntimeState) {
+  try {
+    await uninstallPatch();
+    await context.globalState.update('isEnabled', false);
+    state.isRunning = false;
+    disposeButtons();
+  } catch (error) {
+    reportError(error);
+    throw error;
+  }
+}
+
 export async function activate(context: vscode.ExtensionContext) {
-  let isRunning = false;
+  const state: RuntimeState = { isRunning: false };
   context.subscriptions.push({ dispose: disposePatch }, { dispose: disposeButtons });
-  context.subscriptions.push(vscode.commands.registerCommand('apc.extension.enable', async () => {
-    try {
-      await install(context);
-      await appendIframeStyles();
-      await context.globalState.update('isEnabled', true);
-      isRunning = true;
-      applyButtons(context);
-    } catch (error) {
-      reportError(error);
-      throw error;
-    }
-  }));
-  context.subscriptions.push(vscode.commands.registerCommand('apc.extension.disable', async () => {
-    try {
-      await uninstallPatch();
-      await context.globalState.update('isEnabled', false);
-      isRunning = false;
-      disposeButtons();
-    } catch (error) {
-      reportError(error);
-      throw error;
-    }
-  }));
+  context.subscriptions.push(vscode.commands.registerCommand('apc.extension.enable', () => apcEnable(context, state)));
+  context.subscriptions.push(vscode.commands.registerCommand('apc.extension.disable', () => apcDisable(context, state)));
 
   async function onDidChangeConfiguration(e: vscode.ConfigurationChangeEvent) {
-    if (!isRunning || context.globalState.get('isEnabled') !== true) { return; }
+    if (!state.isRunning || context.globalState.get('isEnabled') !== true) { return; }
     try {
       if (e.affectsConfiguration('apc.theme')) { await changeTheme(); }
-      e.affectsConfiguration('apc.buttons') && applyButtons(context);
+      if (e.affectsConfiguration('apc.buttons')) { applyButtons(context); }
       if (e.affectsConfiguration('apc.imports') || e.affectsConfiguration('apc.stylesheet')) { await updateImports(context); }
-      if (e.affectsConfiguration('apc.iframe.style')) { await appendIframeStyles(); }
+      if (e.affectsConfiguration('apc.iframe.style')) { await updateImports(context); }
       if (e.affectsConfiguration('apc.electron') || e.affectsConfiguration('apc.menubar.compact')) { await promptRestart(); }
     } catch (error) { reportError(error); }
   }
   context.subscriptions.push(vscode.workspace.onDidChangeConfiguration(onDidChangeConfiguration));
   context.subscriptions.push(vscode.workspace.onDidChangeWorkspaceFolders(() => {
-    if (isRunning) { applyButtons(context); }
+    if (state.isRunning) { applyButtons(context); }
   }));
 
   // Commands remain registered even when the application's layout is unsupported
@@ -70,9 +75,8 @@ export async function activate(context: vscode.ExtensionContext) {
   if (context.globalState.get('isEnabled') !== false) {
     try {
       await ensurePatch(context);
-      await appendIframeStyles();
       await context.globalState.update('isEnabled', true);
-      isRunning = true;
+      state.isRunning = true;
     } catch (error) { reportError(error); }
   }
 

@@ -441,6 +441,7 @@
     "package": "vsce package",
     "publish": "vsce publish",
     "vscode:prepublish": "npm run compile",
+    "precompile": "node scripts/clean-build.cjs",
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
     "pretest": "npm run compile && npm run lint && node --test test/lifecycle.test.js test/modern.test.js",

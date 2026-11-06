@@ -21,7 +21,7 @@ Explore my setup for inspiration: [View Settings](https://github.com/drcika/apc-
 On modern VS Code, this port restores CSS/JavaScript imports and live local
 updates. The table below shows which other customizations are available.
 Compatibility is tested on VS Code 1.140.0 and the latest stable release;
-older versions have not been validated by the current test matrix.
+older AMD-based editors are no longer supported.
 
 | Feature | Implemented | Tested |
 | --- | --- | --- |
@@ -42,33 +42,18 @@ older versions have not been validated by the current test matrix.
 🧪 = separate prototype evidence, not integrated feature coverage; ❌ = unavailable
 or unverified. Prototype findings are limited to VS Code 1.143.1 on macOS ARM64.
 
-After enabling APC for the first time, **reload the window** to load its renderer
-script. Configuration and local file edits then update imports without another
-reload. New external origins require a reload because CSP is set at window
-startup. Nested external resources (such as fonts referenced by a remote CSS
-file) remain subject to the rest of VS Code's CSP. Remote imports are not watched.
-
-JavaScript runs as a classic browser script, preserving its global scope.
-Unchanged scripts run once per window, so CSS edits do not redeclare their
-top-level variables. Editing a script runs its new contents; scripts must manage
-their own observers, listeners, and repeated initialization. Reload after changing
-scripts with top-level `const`/`let`, or after removing/disabling scripts whose
-effects need to be undone. Removing a script element cannot undo arbitrary code.
-Import errors identify the source in Developer Tools; unreadable local files and
-patching failures also produce extension notifications.
-
-Patches and the published configuration snapshot are application-wide. Use one
-local profile's APC configuration at a time; different simultaneous profiles do
-not have independent renderer snapshots. Other platforms and older layouts need
-their own validation; do not infer full APC feature parity from import support.
-
-The original HTML is backed up with its checksum, VS Code version, and workbench
-build hash. Partial installation failures roll back. Disable restores the original
-HTML and removes generated files; reload afterward to unload the renderer and
-JavaScript effects. If the editor was independently modified, the backup is
-corrupt, or its build changed, APC refuses to overwrite it with an old backup.
-Use a clean editor installation in that case. A lock left after an editor crash
-is reported with its path and must be cleared before another patch operation.
+- **Reload after enabling or disabling APC**, adding remote import origins, or
+  removing JavaScript effects. CSS and local file edits otherwise update live.
+- **Scripts run once per unchanged file per window.** Edited scripts must clean
+  up their own listeners/observers; reload after editing top-level `const`/`let`.
+- **Use one APC profile per installation.** Patches and import configuration are
+  shared by every window using that editor. Remote resources remain subject to
+  VS Code's CSP and are not watched.
+- **Disable restores the backed-up application files.** If APC reports a changed
+  build, damaged backup, or stale lock, follow the recovery guidance in
+  [CONTRIBUTING.md](CONTRIBUTING.md#patch-recovery).
+- Import errors appear in Developer Tools; file and patch errors also show a
+  notification.
 
 For test setup, porting notes, and contributor guidance, see
 [CONTRIBUTING.md](CONTRIBUTING.md).
@@ -141,8 +126,7 @@ This experimental extension tweaks certain VSCode / VSCodium files. <br>
 
 The examples below include original APC features that have not been ported to
 modern VS Code. Check the [compatibility table](#modern-vs-code-compatibility)
-before using them. Retained legacy implementations are not currently validated
-on older editor versions.
+before using them. The old AMD implementation has been removed.
 
 ### `apc.electron`
 

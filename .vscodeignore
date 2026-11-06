@@ -1,8 +1,10 @@
 .vscode/**
 .vscode-test/**
+.worktrees/**
 out/**
 node_modules/**
 src/**
+scripts/**
 test/**
 .github/**
 .gitignore

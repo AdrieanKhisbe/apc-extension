@@ -54,7 +54,7 @@ function harness(options = {}) {
   }
   const patchStub = {
     ensurePatch: async () => {}, install: async () => {},
-    uninstallPatch: async () => {}, appendIframeStyles: async () => {},
+    uninstallPatch: async () => {},
     disposePatch: () => {}, updateImports: async () => {}, ...patch,
   };
   return {
@@ -74,7 +74,7 @@ test('modern installation preflight rejects before writing any application files
     fs.writeFileSync(path.join(appRoot, 'out/main.js'), 'export {};');
     const h = harness({ appRoot });
     const patch = h.realPatch();
-    await assert.rejects(() => patch.install(h.context), /unsupported|not supported/i);
+    assert.throws(() => patch.install(h.context), /unsupported|not supported/i);
     assert.deepEqual(fs.readdirSync(path.join(appRoot, 'out')), ['main.js']);
     assert.equal(fs.readFileSync(path.join(appRoot, 'out/main.js'), 'utf8'), 'export {};');
   } finally {
@@ -118,7 +118,7 @@ test('enable waits for installation and does not save success on failure', async
 
 test('configuration listener follows enable and disable in the same session', async () => {
   let iframeCalls = 0;
-  const h = harness({ patch: { appendIframeStyles: async () => { iframeCalls++; } } });
+  const h = harness({ patch: { updateImports: async () => { iframeCalls++; } } });
   await h.extension().activate(h.context);
   await h.commands.get('apc.extension.enable')();
   assert.equal(h.state.get('isEnabled'), true);
