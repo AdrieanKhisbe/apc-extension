@@ -68,3 +68,32 @@ test('list wrapper preserves private delegate receivers and remeasures on live r
   runtime.configure({ listRow: { height: 50 } });
   assert.equal(resized.length, 0, 'Disposed views must not be retained or remeasured');
 });
+
+test('list measurements cover default views, per-view overrides, inputs and action buttons', () => {
+  const realm = vm.createContext({ queueMicrotask: callback => callback() });
+  vm.runInContext(fs.readFileSync(path.join(context.extensionPath, 'resources/customizations.js'), 'utf8'), realm);
+  const runtime = realm.__apcCustomizations;
+  const wrap = name => runtime.list({ items: [], disposables: { add() {} } }, { isConnected: true, closest: selector => selector === `.${name}` }, { getHeight: () => 22 });
+  runtime.configure({ listRow: { height: 40, input: 28, actionButton: 32, parts: { 'scm-view': { height: 48 } } } });
+  for (const name of ['customview-tree', 'results', 'open-editors', 'explorer-folders-view', 'outline-tree', 'debug-view-content', 'debug-breakpoints', 'tree']) {
+    const delegate = wrap(name);
+    assert.equal(delegate.getHeight({}), 40, name);
+    assert.equal(delegate.getHeight({ element: { placeholder: true } }), 28, name);
+    assert.equal(delegate.getHeight({ element: { type: 'actionButton' } }), 32, name);
+  }
+  assert.equal(wrap('scm-view').getHeight({}), 48);
+  assert.equal(wrap('unrelated-view').getHeight({}), 22);
+  runtime.configure({ listRow: { height: 50, lists: ['results'] } });
+  assert.equal(wrap('results').getHeight({}), 50);
+  assert.equal(wrap('scm-view').getHeight({}), 22);
+});
+
+test('font styles cover every supported part and reject unknown selectors', () => {
+  const parts = { 'monaco-menu': '.monaco-menu', banner: '.part.banner', titlebar: '.part.titlebar', statusbar: '.part.statusbar', panel: '.part.panel', 'extension-editor': '.extension-editor', 'settings-body': '.settings-body', auxiliarybar: '.part.auxiliarybar', tabs: '.tabs-container', sidebar: '.part.sidebar' };
+  settings = { 'parts.font.family': Object.fromEntries(Object.keys(parts).map(key => [key, 'Georgia'])), 'monospace.font.family': 'monospace' };
+  const css = customizationStyles();
+  for (const selector of Object.values(parts)) { assert.ok(css.includes(`${selector}{font-family:Georgia !important}`), selector); }
+  assert.ok(css.includes('--monaco-monospace-font:monospace'));
+  settings = { 'parts.font.family': { 'body *': 'Georgia' } };
+  assert.throws(customizationStyles, /Unknown APC font part/);
+});

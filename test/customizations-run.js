@@ -1,3 +1,4 @@
+const { withBackgroundEditor } = require('./background-editor');
 const fs = require('node:fs');
 const path = require('node:path');
 const os = require('node:os');
@@ -12,6 +13,7 @@ async function main() {
   const executable = process.env.APC_EDITOR;
   assert.ok(executable, 'APC_EDITOR must identify an isolated editor copy');
   const appRoot = process.platform === 'darwin' ? path.resolve(executable, '../../Resources/app') : path.join(path.dirname(executable), 'resources/app');
+  return withBackgroundEditor(appRoot, async () => {
   const version = JSON.parse(fs.readFileSync(path.join(appRoot, 'package.json'))).version;
   const initial = { 'font.family': 'Georgia', 'parts.font.family': { statusbar: 'monospace' }, listRow: { height: 40, fontSize: 17, lists: ['explorer-folders-view'] }, header: { height: 44, fontSize: 19 }, 'sidebar.titlebar': { height: 48, fontSize: 18 }, statusBar: { height: 40, fontSize: 17 }, activityBar: { size: 68 } };
   const originalLoad = Module._load;
@@ -58,5 +60,6 @@ async function main() {
     if (fs.existsSync(logs)) { fs.cpSync(logs, path.join(runDirectory, 'logs'), { recursive: true }); }
     fs.rmSync(profile, { recursive: true, force: true });
   }
+  });
 }
 main().catch(error => { console.error(error); process.exitCode = 1; });

@@ -1,3 +1,4 @@
+const { withBackgroundEditor } = require('./background-editor');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -23,6 +24,7 @@ async function main() {
   const appRoot = process.platform === 'darwin'
     ? path.resolve(path.dirname(vscodeExecutablePath), '../Resources/app')
     : path.join(path.dirname(vscodeExecutablePath), 'resources/app');
+  return withBackgroundEditor(appRoot, async () => {
   const workbench = ['electron-browser', 'electron-sandbox'].map(kind => path.join(appRoot, 'out/vs/code', kind, 'workbench'))
     .find(base => fs.existsSync(path.join(base, 'workbench.html')));
   assert.ok(workbench, 'Downloaded editor must have a supported workbench');
@@ -139,6 +141,7 @@ async function main() {
     await new Promise(resolve => external.close(resolve));
     console.log(`Editor logs: ${run}`);
   }
+  });
 }
 
 main().catch(error => {

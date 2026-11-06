@@ -1,3 +1,4 @@
+const { withBackgroundEditor } = require('./background-editor');
 // Run after compilation with Node 22: node test/native.run.js /path/to/disposable.app
 // macOS control + native getters + real compact menu; touches only an APFS clone.
 const assert = require('node:assert/strict');
@@ -31,6 +32,7 @@ async function run() {
   const app = process.env.APC_NATIVE_TEST_APP || path.join(runtime, 'Visual Studio Code.app');
   if (!process.env.APC_NATIVE_TEST_APP) { assert.equal(spawnSync('cp', ['-cR', source, app]).status, 0); }
   const appRoot = path.join(app, 'Contents/Resources/app');
+  return withBackgroundEditor(appRoot, async () => {
   const executable = path.join(app, 'Contents/MacOS/Code');
   const options = { opacity: 0.83, trafficLightPosition: { x: 30, y: 30 }, backgroundColor: '#112233' };
   const vscode = { env: { appRoot }, workspace: { getConfiguration: () => ({ get: key => key === 'electron' ? options : key === 'menubar.compact' }) } };
@@ -99,5 +101,6 @@ async function run() {
   }
   await launch('restored', async cdp => { assert.equal(await cdp.evaluate(`document.querySelectorAll('.menubar').length`), evidence.control.menuCount); });
   console.log('PASS: native window options, compact menu, and clean restored startup.');
+  });
 }
 run().catch(error => { console.error(error); process.exitCode = 1; });

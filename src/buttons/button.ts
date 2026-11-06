@@ -11,25 +11,48 @@ type ButtonConfig = {
 
 let subscriptions: any[] = [];
 
-function processScm(context: vscode.ExtensionContext, statusBarButton: vscode.StatusBarItem) {
-  if (vscode.extensions) {
-    const git = vscode.extensions.getExtension('vscode.git')?.exports.getAPI(1);
+function processScm(statusBarButton: vscode.StatusBarItem) {
+  const extension = vscode.extensions?.getExtension('vscode.git');
+  if (!extension) { return; }
+  let disposed = false;
+  const lifecycle: vscode.Disposable[] = [];
+  subscriptions.push({ dispose() {
+    disposed = true;
+    lifecycle.forEach(subscription => subscription.dispose());
+  } });
+  function connect(api: any) {
+    if (disposed) { return; }
+    const git = api?.getAPI?.(1);
+    if (!git) { return; }
+    const repositories = new Map<any, vscode.Disposable>();
 
     function updateStatusBar() {
       let totalChanges = 0;
-      git?.repositories.forEach((repository: any) => {
+      git.repositories.forEach((repository: any) => {
         totalChanges += repository.state.workingTreeChanges.length;
       });
       statusBarButton.text = `$(source-control) ${totalChanges}`;
       statusBarButton.show();
     }
 
-    git?.repositories.forEach((repository: any) => {
-      const subs = repository.state.onDidChange(updateStatusBar);
-      subscriptions.push(subs);
-      context.subscriptions.push(subs);
-    });
+    function refreshRepositories() {
+      for (const [repository, subscription] of repositories) {
+        if (!git.repositories.includes(repository)) { subscription.dispose(); repositories.delete(repository); }
+      }
+      for (const repository of git.repositories) {
+        if (!repositories.has(repository)) { repositories.set(repository, repository.state.onDidChange(updateStatusBar)); }
+      }
+      updateStatusBar();
+    }
+    lifecycle.push(git.onDidOpenRepository(refreshRepositories), git.onDidCloseRepository(refreshRepositories), { dispose() {
+      repositories.forEach(subscription => subscription.dispose());
+      repositories.clear();
+    } });
+    refreshRepositories();
   }
+  if (extension.isActive === false) {
+    void Promise.resolve(extension.activate()).then(connect).catch(error => console.warn('APC SCM button could not activate Git:', error));
+  } else { connect(extension.exports); }
 }
 
 function createTerminalCommand(command: string) {
@@ -54,7 +77,7 @@ function addButton(context: vscode.ExtensionContext, button: ButtonConfig) {
   statusBarButton.show();
 
   if (button.vscommand === 'workbench.view.scm') {
-    processScm(context, statusBarButton);
+    processScm(statusBarButton);
   }
   return statusBarButton;
 }

@@ -229,6 +229,19 @@ test('theme writes do not promote workspace colors into global settings', async 
   assert.equal(h.settings.get('workbench.colorCustomizations'), undefined);
 });
 
+test('theme refuses to write colors when ownership cannot be persisted or is corrupt', async () => {
+  for (const corrupt of [false, true]) {
+    const original = { 'statusBar.background': '#112233' };
+    const h = harness({
+      settings: new Map([['apc.theme', [{ color: '#abcdef', tokens: ['statusBar.background'] }]], ['workbench.colorCustomizations', original]]),
+      beforeStateUpdate: () => { if (!corrupt) { throw new Error('storage unavailable'); } },
+    });
+    if (corrupt) { h.state.set('themeOverrides', { version: 42 }); }
+    await assert.rejects(() => h.theme().apply(), corrupt ? /ownership is invalid/ : /storage unavailable/);
+    assert.deepEqual(h.settings.get('workbench.colorCustomizations'), original);
+  }
+});
+
 test('failed theme application rolls back installation and keeps enable retryable', async () => {
   let removals = 0; let fail = true;
   const h = harness({

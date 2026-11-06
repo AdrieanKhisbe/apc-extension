@@ -1,3 +1,4 @@
+const { withBackgroundEditor } = require('./background-editor');
 // Standalone real-editor coverage for the webview patch preparation module.
 // The shared installation transaction/watcher is covered by the parent harness.
 const fs = require('node:fs');
@@ -12,6 +13,7 @@ async function main() {
   const executable = process.env.APC_WEBVIEW_EXECUTABLE || await downloadAndUnzipVSCode({ version, cachePath: path.join(root, '.vscode-test', 'webview-editor') });
   assert.ok(path.resolve(executable).startsWith(path.join(root, '.vscode-test') + path.sep), 'Use a disposable editor inside this checkout test cache');
   const appRoot = process.platform === 'darwin' ? path.resolve(path.dirname(executable), '../Resources/app') : path.join(path.dirname(executable), 'resources/app');
+  return withBackgroundEditor(appRoot, async () => {
   const template = path.join(appRoot, 'out/vs/workbench/contrib/webview/browser/pre/index.html');
   const original = fs.readFileSync(template);
   const profile = fs.mkdtempSync(path.join(process.platform === 'darwin' ? '/tmp' : os.tmpdir(), 'apc-wv-'));
@@ -36,6 +38,7 @@ async function main() {
     if (fs.existsSync(logs)) { fs.cpSync(logs, path.join(output, 'logs'), { recursive: true }); }
     fs.rmSync(profile, { recursive: true, force: true });
   }
+  });
 }
 
 main().catch(error => { console.error(error); process.exitCode = 1; });

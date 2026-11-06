@@ -1,6 +1,7 @@
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
+const { execFileSync } = require('node:child_process');
 const vscode = require('vscode');
 const { connect, eventually } = require('./cdp');
 
@@ -72,6 +73,32 @@ exports.run = async function () {
     await update('apc.buttons', []);
     await eventually(async () => (await labels()).length === 0 && !(await vscode.commands.getCommands(true)).includes(generatedCommand), 'Removing buttons must dispose their items and generated commands');
 
+    // Real built-in Git API plus rendered SCM button, in a disposable repository.
+    const gitExtension = vscode.extensions.getExtension('vscode.git');
+    const git = (await gitExtension.activate()).getAPI(1);
+    const repositoryPath = path.join(process.env.APC_FIXTURE, 'scm-repository');
+    fs.mkdirSync(repositoryPath);
+    const gitCommand = args => execFileSync('git', args, { cwd: repositoryPath });
+    gitCommand(['init']);
+    fs.writeFileSync(path.join(repositoryPath, 'tracked.txt'), 'baseline');
+    gitCommand(['add', '.']);
+    gitCommand(['-c', 'user.name=APC Tests', '-c', 'user.email=apc-tests@example.invalid', 'commit', '-m', 'fixture']);
+    fs.writeFileSync(path.join(repositoryPath, 'tracked.txt'), 'modified');
+    const repository = await git.openRepository(vscode.Uri.file(repositoryPath));
+    assert.ok(repository, 'Built-in Git must open the fixture repository');
+    await repository.status();
+    const scmText = () => cdp.evaluate(`document.querySelector('.statusbar-item .codicon-source-control')?.closest('.statusbar-item')?.textContent.trim()`);
+    const expectedCount = () => git.repositories.reduce((total, repo) => total + repo.state.workingTreeChanges.length, 0);
+    await update('apc.buttons', [{ text: 'SCM', tooltip: 'APC SCM coverage', vscommand: 'workbench.view.scm' }]);
+    await eventually(async () => (await scmText()) === String(expectedCount()), 'SCM button must initialize its count');
+    assert.equal(repository.state.workingTreeChanges.length, 1);
+    fs.writeFileSync(path.join(repositoryPath, 'new.txt'), 'untracked');
+    await repository.status();
+    await eventually(async () => (await scmText()) === String(expectedCount()), 'SCM button must update from actual Git changes');
+    assert.equal(repository.state.workingTreeChanges.length, 2);
+    await update('apc.buttons', []);
+    await eventually(async () => !(await scmText()), 'SCM button must be removed');
+
     // Check published colors and real renderer output, including a second edit.
     await update('workbench.colorCustomizations', { 'editor.background': '#102030' });
     await update('apc.theme', [{ color: '#123456', tokens: ['statusBar.background', 'statusBar.noFolderBackground'] }]);
@@ -85,6 +112,7 @@ exports.run = async function () {
     await eventually(async () => (await labels()).includes('APC check disable'), 'Button missing before disable');
     await vscode.commands.executeCommand('apc.extension.disable');
     await eventually(async () => (await labels()).length === 0 && !(await vscode.commands.getCommands(true)).includes(generatedCommand), 'Disable must dispose buttons and generated commands');
+    await eventually(() => JSON.stringify(colors()) === JSON.stringify({ 'editor.background': '#102030' }), 'Disable must restore previous colors before subsequent edits');
     await update('apc.buttons', [{ text: 'APC check reenable', vscommand: 'apc.test.button' }]);
     await update('apc.theme', [{ color: '#abcdef', tokens: ['statusBar.background'] }]);
     // A configuration read after the next event turn checks disabled-state gating.

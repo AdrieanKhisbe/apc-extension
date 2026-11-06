@@ -30,10 +30,10 @@ latest stable release; the old AMD implementation has been removed.
 | HTTP(S) import objects | ✅ Configured script/style origins | ✅ Real-editor loading under CSP |
 | `apc.stylesheet` | ✅ Live configuration updates | ✅ Real-editor changes and removal |
 | Live local file updates | ✅ Including atomic saves | ✅ Real-editor CSS/JS updates and unchanged-script deduplication |
-| `apc.buttons` | ✅ Status-bar commands and terminal buttons | 🟡 Automated startup, clicks, updates, priority, terminal execution, cleanup and re-enable; SCM counts untested |
+| `apc.buttons` | ✅ Status-bar commands, terminal buttons and live SCM counts | ✅ Startup, clicks, priority, terminal execution, Git counts, repository lifecycle, cleanup and re-enable |
 | `apc.theme` | ✅ Startup/live colors and persistent restoration on removal/disable | ✅ Lifecycle, reopening, manual-edit preservation, interrupted writes, renderer colors and disabled-state gating |
-| Font overrides | ✅ Global, monospace and per-part styles | 🟡 Computed global/part fonts and removal; not every selector or font combination |
-| List row/header dimensions | ✅ Virtualized measurements, font sizes and tab/sidebar headers | 🟡 Explorer geometry, pointer selection, scrolling, live updates and reset; other list types need coverage |
+| Font overrides | ✅ Global, monospace and per-part styles | 🟡 All part selectors checked in unit tests; computed global/part fonts and removal in editor; other font combinations unverified |
+| List row/header dimensions | ✅ Virtualized measurements, font sizes and tab/sidebar headers | 🟡 Default delegates and special rows checked in unit tests; Explorer geometry, pointer selection, scrolling, live updates and reset in editor |
 | Activity/status bar layout | ✅ Measured sizing, horizontal bottom activity bar and four status positions | 🟡 Grid bounds, mouse/keyboard navigation, live changes, bottom-panel handling and reset; other layout combinations need coverage |
 | `apc.electron`, compact menubar | ✅ Documented window options and compact menus | 🟡 macOS window getters, sandbox preservation, mouse/keyboard menus and restoration; other OS visual effects unverified |
 | Iframe/webview styling | ✅ Object/file CSS, file watching and restoration | 🟡 Three CSP policies, theme/recreation, live publication, isolation and restoration; other extension lifecycles need coverage |

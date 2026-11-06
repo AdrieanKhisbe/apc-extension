@@ -18,7 +18,14 @@ so cleanup cannot mask a failed restoration.
 
 `test/public-api.test.js` covers command/terminal buttons, priority, configuration
 changes, removal, disable/re-enable, live theme colors and preservation, plus
-status height A→B→A. SCM counts and theme startup/token removal remain untested.
+status height A→B→A. It also checks SCM counts against the built-in Git API in
+a temporary repository. `test/buttons.test.js` covers initial counts, repository
+open/close events, delayed Git activation and subscription cleanup.
+`test/lifecycle.test.js` covers theme startup, token removal, reopening with saved
+ownership, manual edits, global/workspace separation and interrupted writes.
+`test/customizations.test.js` covers all supported font selectors and default
+list delegates, including per-view overrides and special input/action rows;
+the editor suite verifies actual geometry for Explorer.
 `test/webview.integration.js` exercises the actual watcher/configuration path.
 `test/webview.run.js` additionally checks three CSP policies, theme changes and
 document recreation in a separate fixture extension.
