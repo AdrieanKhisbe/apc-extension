@@ -71,6 +71,11 @@ exports.run = async () => {
     await input({ type: 'keyDown', key: 'ArrowRight', code: 'ArrowRight', windowsVirtualKeyCode: 39 }, 'Input.dispatchKeyEvent');
     await input({ type: 'keyUp', key: 'ArrowRight', code: 'ArrowRight', windowsVirtualKeyCode: 39 }, 'Input.dispatchKeyEvent');
     assert.equal(await cdp.evaluate(`document.activeElement !== globalThis.__apcFirstActivityFocus && !!document.activeElement?.closest('.part.activitybar')`), true, 'Horizontal activity navigation must respond to ArrowRight');
+    if ((await vscode.commands.getCommands(true)).includes('notifications.clearAll')) {
+      await vscode.commands.executeCommand('notifications.clearAll');
+    }
+    const screenshot = await cdp.send('Page.captureScreenshot', { format: 'png' });
+    fs.writeFileSync(process.env.APC_CUSTOMIZATIONS_RESULTS.replace(/\.json$/, '.png'), Buffer.from(screenshot.data, 'base64'));
     await cdp.evaluate(`globalThis.__apcCustomizations.configure({activityBar:{size:56,position:'bottom'},statusBar:{height:32,position:'editor-top'}});true`);
     const editorTop = await snapshot();
     assert.ok(editorTop.status.bottom <= editorTop.editor.y && editorTop.editor.y - editorTop.status.bottom <= 8, 'Editor-top status bar must reserve space above the editor');

@@ -16,10 +16,11 @@ function fixture(t) {
   fs.writeFileSync(path.join(base, 'workbench.html'), html);
   fs.writeFileSync(path.join(base, 'workbench.js'), 'export {};');
   const config = new Map([['apc.imports', []]]);
+  const notifications = [];
   const vscode = {
     env: { appRoot: root }, version: '1.140.0',
     workspace: { getConfiguration: section => ({ get: key => config.get(section ? section + '.' + key : key) }) },
-    window: { showInformationMessage: () => Promise.resolve(), showErrorMessage() {} },
+    window: { showInformationMessage: message => { notifications.push(message); return Promise.resolve(); }, showErrorMessage() {} },
   };
   let fault;
   const watchCallbacks = [];
@@ -51,7 +52,7 @@ function fixture(t) {
   const modern = load(path.resolve(__dirname, '../dist/patch.js'));
   t.after(() => { modern.disposePatch(); fs.rmSync(root, { recursive: true, force: true }); });
   return {
-    root, base, config, modern,
+    root, base, config, modern, notifications,
     context: { extensionPath: path.resolve(__dirname, '..') },
     failWrite: predicate => { fault = predicate; },
     watchCallbacks,
@@ -72,6 +73,15 @@ test('modern install preserves startup/CSP and repeated install restores the exa
   assert.equal(f.modern.uninstallPatch(), true);
   assert.equal(f.currentHtml(), html);
   assert.ok(!fs.existsSync(path.join(f.base, 'apc-extension')));
+});
+
+test('first startup requests a reload while an unchanged startup does not repeat the prompt', t => {
+  const f = fixture(t);
+  f.modern.ensurePatch(f.context);
+  assert.equal(f.notifications.length, 1);
+  assert.match(f.notifications[0], /Reload VS Code/);
+  f.modern.ensurePatch(f.context);
+  assert.equal(f.notifications.length, 1);
 });
 
 test('local file URLs, absolute paths, object imports, and stylesheet preserve order', t => {
@@ -290,7 +300,7 @@ test('native changes share backup, refresh, setting-removal and uninstall transa
   fs.mkdirSync(path.dirname(renderer), { recursive: true });
   fs.writeFileSync(main, 'await import("./mainImpl.js");');
   fs.writeFileSync(implementation, 'function options(){const c={backgroundColor:theme.getBackgroundColor(),minWidth:400,webPreferences:{sandbox:!0,autoplayPolicy:"user-gesture-required"}};return tweak&&(c.webPreferences={backgroundThrottling:!1}),c}function next(){}' + visibility);
-  const measurements = 'class A{constructor(a,b,c,d=Opts){this.virtualDelegate=b;this.domId=`list_id_${1}`;}get tabHeight(){let a=this.groupsView.partOptions.tabHeight;return a==="compact"?22:35}getHoverTitle(){}};this.workbenchGrid=a,this.workbenchGrid.edgeSnapping=false;function layout(a,b){let c;if(this.options.hasTitle){let d=35;c=new D(a,Math.min(b,d))}else c=D.None;let e;if(this.headerVisible){}}';
+  const measurements = 'class A{constructor(a,b,c,d=Opts){this.virtualDelegate=b;this.domId=`list_id_${1}`;}get tabHeight(){let a=this.groupsView.partOptions.tabHeight;return a==="compact"?22:35}getHoverTitle(){}};this.workbenchGrid=a,this.workbenchGrid.edgeSnapping=false;const options={partContainerClass:"activitybar",orientation:1,icon:true};this._orientation=this.options.orientation??0,this.foo=1;function layout(a,b){let c;if(this.options.hasTitle){let d=35;c=new D(a,Math.min(b,d))}else c=D.None;let e;if(this.headerVisible){}}';
   fs.writeFileSync(renderer, measurements + visibility);
   const originals = new Map([main, implementation, renderer].map(file => [file, fs.readFileSync(file, 'utf8')]));
   f.config.set('apc.electron', { opacity: 0.8 });

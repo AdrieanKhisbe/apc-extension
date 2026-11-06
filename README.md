@@ -18,10 +18,10 @@ Explore my setup for inspiration: [View Settings](https://github.com/drcika/apc-
 
 ## Modern VS Code compatibility
 
-On modern VS Code, this port restores CSS/JavaScript imports and live local
-updates. The table below shows which other customizations are available.
-Compatibility is tested on VS Code 1.140.0 and the latest stable release;
-older AMD-based editors are no longer supported.
+This port restores imports, UI customizations, native window options, and
+webview styling on module-based VS Code. Tested coverage is listed separately.
+Requires VS Code 1.140.0 or newer. Compatibility is tested on 1.140.0 and the
+latest stable release; the old AMD implementation has been removed.
 
 | Feature | Implemented | Tested |
 | --- | --- | --- |
@@ -32,18 +32,20 @@ older AMD-based editors are no longer supported.
 | Live local file updates | ✅ Including atomic saves | ✅ Real-editor CSS/JS updates and unchanged-script deduplication |
 | `apc.buttons` | ✅ Status-bar commands and terminal buttons | 🟡 Automated startup, clicks, updates, priority, terminal execution, cleanup and re-enable; SCM counts untested |
 | `apc.theme` | 🟡 Applies color tokens on configuration changes | 🟡 Automated live colors, preservation and disabled-state gating; startup/removal not covered |
-| Font overrides | ❌ Not ported | 🧪 Selected font styling demonstrated in prototype |
-| List row/header dimensions | ❌ Not ported | 🧪 Explorer measurement hook works; CSS-only rows/headers have geometry errors |
-| Activity/status bar layout | ❌ APC overrides not ported | 🧪 Built-in placement checked; custom CSS sizing/placement has geometry errors |
-| `apc.electron`, compact menubar | ❌ Not ported | ❌ Runtime unverified; source investigation only |
-| Iframe/webview styling | ❌ Not ported | 🧪 Privileged template injection demonstrated on fixture webviews |
+| Font overrides | ✅ Global, monospace and per-part styles | 🟡 Computed global/part fonts and removal; not every selector or font combination |
+| List row/header dimensions | ✅ Virtualized measurements, font sizes and tab/sidebar headers | 🟡 Explorer geometry, pointer selection, scrolling, live updates and reset; other list types need coverage |
+| Activity/status bar layout | ✅ Measured sizing, horizontal bottom activity bar and four status positions | 🟡 Grid bounds, mouse/keyboard navigation, live changes, bottom-panel handling and reset; other layout combinations need coverage |
+| `apc.electron`, compact menubar | ✅ Documented window options and compact menus | 🟡 macOS window getters, sandbox preservation, mouse/keyboard menus and restoration; other OS visual effects unverified |
+| Iframe/webview styling | ✅ Object/file CSS, file watching and restoration | 🟡 Three CSP policies, theme/recreation, live publication, isolation and restoration; other extension lifecycles need coverage |
 
-✅ = implemented or automated checks passed for the stated scope; 🟡 = partial;
-🧪 = separate prototype evidence, not integrated feature coverage; ❌ = unavailable
-or unverified. Prototype findings are limited to VS Code 1.143.1 on macOS ARM64.
+✅ = implemented or automated checks passed for the stated scope; 🟡 = partial
+implementation or coverage. Native-window visual checks cover VS Code 1.140.0 and 1.143.1 on macOS
+ARM64. Unknown internal layouts are rejected before application files are changed.
 
-- **Reload after enabling or disabling APC**, adding remote import origins, or
-  removing JavaScript effects. CSS and local file edits otherwise update live.
+- **Reload after enabling/disabling APC**, first enabling layout hooks, adding
+  remote import origins, or removing JavaScript effects. Later UI/CSS edits update
+  live. **Restart VS Code** for native window/menu changes; **recreate webviews**
+  after webview style changes. Extensions can override these shared webview styles.
 - **Scripts run once per unchanged file per window.** Edited scripts must clean
   up their own listeners/observers; reload after editing top-level `const`/`let`.
 - **Use one APC profile per installation.** Patches and import configuration are
@@ -124,13 +126,10 @@ This experimental extension tweaks certain VSCode / VSCodium files. <br>
 
 ## Configuration reference
 
-The examples below include original APC features that have not been ported to
-modern VS Code. Check the [compatibility table](#modern-vs-code-compatibility)
-before using them. The old AMD implementation has been removed.
+Check the [compatibility table](#modern-vs-code-compatibility) for tested scope
+and the reload/restart requirements before using these settings.
 
 ### `apc.electron`
-
-**Unavailable on modern VS Code in this port.**
 
 Configures the Electron window. For detailed info, see the [Electron BrowserWindow documentation](https://www.electronjs.org/docs/latest/api/browser-window#new-browserwindowoptions)
 
@@ -215,8 +214,7 @@ Configures the Electron window. For detailed info, see the [Electron BrowserWind
 
 ### `font.family`
 
-**These APC font overrides are unavailable on modern VS Code in this port.**
-Normal VS Code editor font settings remain available.
+Normal VS Code editor font settings remain separate from these workbench overrides.
 
 Customize font family for any part of VS Code
 
@@ -311,8 +309,6 @@ Customize VS Code's Look and Feel with Real-time CSS & JS Imports
 
 ### `apc.menubar.compact`
 
-**Unavailable on modern VS Code in this port.**
-
 Move Menu bar to Activity bar for a compact design
 
 ```jsonc
@@ -320,8 +316,6 @@ Move Menu bar to Activity bar for a compact design
 ```
 
 ### `apc.header`
-
-**Unavailable on modern VS Code in this port.**
 
 Adjust the height and font size of the header bar
 
@@ -335,8 +329,6 @@ Adjust the height and font size of the header bar
 ```
 
 ### `apc.activityBar`
-
-**Unavailable on modern VS Code in this port.**
 
 Set the position and dimensions of the activity bar
 
@@ -363,8 +355,6 @@ Alternative
 
 ### `apc.sidebar.titlebar`
 
-**Unavailable on modern VS Code in this port.**
-
 Define the height and font size of the sidebar title bar
 
 ```jsonc
@@ -375,8 +365,6 @@ Define the height and font size of the sidebar title bar
 ```
 
 ### `apc.statusBar`
-
-**Unavailable on modern VS Code in this port.**
 
 Set the position and height of the status bar
 
@@ -389,8 +377,6 @@ Set the position and height of the status bar
 ```
 
 ### `apc.listRow`
-
-**Unavailable on modern VS Code in this port.**
 
 Specify the height and font size of list rows
 
@@ -424,8 +410,6 @@ Specify the height and font size of list rows
 ```
 
 ### `apc.iframe.style`
-
-**Unavailable on modern VS Code in this port.**
 
 Apply custom CSS to iframes (Notebook, Extension view, etc)
 

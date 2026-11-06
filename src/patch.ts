@@ -310,6 +310,7 @@ function applyInstallation(layout: Layout, context: vscode.ExtensionContext, not
   const backup: State = { format: 1, version: vscode.version, workbenchHash: digest(fs.readFileSync(layout.workbench)), original, originalHash: digest(original), patchedHash: digest(html), files: {} };
   const changes = new Map<string, string | undefined>();
   let applicationChanged = false;
+  let nativeChanged = false;
   for (const [file, content] of applicationChanges) {
     const relative = path.relative(path.join(vscode.env.appRoot, 'out'), file);
     if (applicationFile(relative) !== file || file === layout.html || file.startsWith(layout.directory + path.sep)) {
@@ -326,7 +327,11 @@ function applyInstallation(layout: Layout, context: vscode.ExtensionContext, not
     }
     backup.files![relative] = snapshot;
     const current = fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : undefined;
-    if (current !== content) { applicationChanged = true; changes.set(file, content); }
+    if (current !== content) {
+      applicationChanged = true;
+      if (['main.js', 'mainImpl.js', 'apc-native-loader.mjs'].includes(relative)) { nativeChanged = true; }
+      changes.set(file, content);
+    }
   }
   // Publish native dependencies before the main-process entry point. The native
   // adapter also falls back to editor defaults during concurrent window starts.
@@ -341,14 +346,15 @@ function applyInstallation(layout: Layout, context: vscode.ExtensionContext, not
   try { transaction(layout, changes); }
   catch (error) { disposePatch(); throw error; }
   if (notify && (!state || state.patchedHash !== backup.patchedHash || applicationChanged)) {
-    void vscode.window.showInformationMessage('Reload VS Code windows and recreate webviews to apply changed application customizations.', 'Reload Window')
+    const message = nativeChanged ? 'Restart VS Code to apply native window and menu changes.' : 'Reload VS Code windows and recreate webviews to apply changed application customizations.';
+    void vscode.window.showInformationMessage(message, ...(nativeChanged ? [] : ['Reload Window']))
       .then(action => { if (action === 'Reload Window') { void vscode.commands.executeCommand('workbench.action.reloadWindow'); } });
   }
 }
 
 // Configuration changes reapply the same idempotent installation transaction.
 export function updateImports(context: vscode.ExtensionContext) { install(context); }
-export function ensurePatch(context: vscode.ExtensionContext) { install(context, false); }
+export function ensurePatch(context: vscode.ExtensionContext) { install(context); }
 
 export function uninstallPatch(): boolean {
   const layout = findLayout();

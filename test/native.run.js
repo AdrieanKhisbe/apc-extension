@@ -25,7 +25,9 @@ async function run() {
   const root = path.resolve(__dirname, '..');
   const source = process.argv[2];
   assert.ok(source && !source.startsWith('/Applications/'), 'Supply a disposable editor download');
-  const runtime = fs.mkdtempSync(path.join(root, '.native-runtime-'));
+  const cache = path.join(root, '.vscode-test');
+  fs.mkdirSync(cache, { recursive: true });
+  const runtime = fs.mkdtempSync(path.join(cache, 'native-runtime-'));
   const app = process.env.APC_NATIVE_TEST_APP || path.join(runtime, 'Visual Studio Code.app');
   if (!process.env.APC_NATIVE_TEST_APP) { assert.equal(spawnSync('cp', ['-cR', source, app]).status, 0); }
   const appRoot = path.join(app, 'Contents/Resources/app');

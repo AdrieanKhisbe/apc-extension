@@ -4,6 +4,7 @@ const path = require('node:path');
 const net = require('node:net');
 const http = require('node:http');
 const assert = require('node:assert/strict');
+const { spawn } = require('node:child_process');
 const { downloadAndUnzipVSCode, runTests } = require('@vscode/test-electron');
 
 async function main() {
@@ -73,8 +74,10 @@ async function main() {
     'apc.electron': { opacity: 0.95 },
     'apc.menubar.compact': true,
     'apc.font.family': 'Georgia',
+    'apc.monospace.font.family': 'monospace',
     'apc.parts.font.family': { statusbar: 'monospace' },
     'apc.statusBar': { height: 30 },
+    'apc.activityBar': { size: 56, position: 'bottom' },
   }));
   const server = net.createServer();
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
@@ -110,6 +113,15 @@ async function main() {
     assert.ok(!fs.existsSync(nativeLoaderPath), 'Disable must remove the native bootstrap');
     assert.deepEqual(fs.readFileSync(webviewPath), originalWebview, 'Disable must restore the exact webview template');
     assert.ok(!fs.existsSync(patchDirectory), 'Disable must remove all modern patch files');
+    console.log('Running measured-layout editor suite');
+    await new Promise((resolve, reject) => {
+      const child = spawn(process.execPath, [path.join(__dirname, 'customizations-run.js')], {
+        env: { ...process.env, APC_EDITOR: vscodeExecutablePath }, stdio: 'inherit',
+      });
+      child.once('error', reject);
+      child.once('exit', (code, signal) => code === 0 ? resolve() : reject(new Error(`Measured-layout suite failed: ${signal || code}`)));
+    });
+    assert.deepEqual(fs.readFileSync(desktopPath), originalDesktop, 'Measured-layout suite must restore the renderer bundle');
   } finally {
     // Also restore the disposable application if a suite fails before disable.
     fs.writeFileSync(htmlPath, original);

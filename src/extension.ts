@@ -3,7 +3,6 @@ import * as vscode from 'vscode';
 import { applyButtons, disposeButtons } from './buttons/button';
 import * as customizations from './customizations.json';
 import { ensurePatch, uninstallPatch, install, disposePatch, updateImports } from './patch';
-import { promptRestart } from './utils';
 
 async function changeTheme() {
   const config = vscode.workspace.getConfiguration();
@@ -64,7 +63,6 @@ export async function activate(context: vscode.ExtensionContext) {
         'apc.font.family', 'apc.monospace.font.family', 'apc.parts.font.family', 'apc.listRow',
         'apc.header', 'apc.sidebar.titlebar', 'apc.activityBar', 'apc.statusBar'];
       if (patchSettings.some(key => e.affectsConfiguration(key))) { await updateImports(context); }
-      if (e.affectsConfiguration('apc.electron') || e.affectsConfiguration('apc.menubar.compact')) { await promptRestart(); }
     } catch (error) { reportError(error); }
   }
   context.subscriptions.push(vscode.workspace.onDidChangeConfiguration(onDidChangeConfiguration));

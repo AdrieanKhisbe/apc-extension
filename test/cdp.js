@@ -33,16 +33,22 @@ async function connect(port) {
       callback(response);
     }
   });
+  async function send(method, params) {
+    const requestId = ++id;
+    const response = await new Promise((resolve, reject) => {
+      const timer = setTimeout(() => { pending.delete(requestId); reject(new Error('CDP timed out')); }, 10000);
+      pending.set(requestId, value => { clearTimeout(timer); resolve(value); });
+      socket.send(JSON.stringify({ id: requestId, method, params }));
+    });
+    assert.ok(!response.error, JSON.stringify(response));
+    return response.result;
+  }
   return {
+    send,
     async evaluate(expression) {
-      const requestId = ++id;
-      const response = await new Promise((resolve, reject) => {
-        const timer = setTimeout(() => { pending.delete(requestId); reject(new Error('CDP timed out')); }, 10000);
-        pending.set(requestId, value => { clearTimeout(timer); resolve(value); });
-        socket.send(JSON.stringify({ id: requestId, method: 'Runtime.evaluate', params: { expression, returnByValue: true, awaitPromise: true } }));
-      });
-      assert.ok(!response.error && !response.result.exceptionDetails, JSON.stringify(response));
-      return response.result.result.value;
+      const response = await send('Runtime.evaluate', { expression, returnByValue: true, awaitPromise: true });
+      assert.ok(!response.exceptionDetails, JSON.stringify(response));
+      return response.result.value;
     },
     close: () => socket.close(),
   };

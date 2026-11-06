@@ -1,8 +1,4 @@
 import * as vscode from 'vscode';
-export async function promptRestart() {
-  await vscode.window.showInformationMessage('Restart VS Code to apply native window and menu changes.');
-}
-
 export function getConfiguration<T>(configuration: string) {
   const config = vscode.workspace.getConfiguration();
   return config.get<T>(configuration);

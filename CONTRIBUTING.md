@@ -1,102 +1,98 @@
 # Contributing
 
-This guide covers development, test setup, and the modern compatibility port.
-For installation, configuration, and feature availability, see [README.md](README.md).
+User setup and feature availability are in [README.md](README.md).
 
-## Functional and regression tests
+## Tests
 
-With Node.js 22 or newer, run `npm ci` then `npm test`. The test compiles and lints the extension, downloads
-VS Code 1.140.0 into `.vscode-test`, and launches its real extension host with
-isolated user data and extensions. APC is enabled normally and the test executes
-`apc.extension.enable`. It never launches the machine's installed editor.
+Use Node.js 22 or newer: `npm ci`, then `npm test`. On Linux, use
+`xvfb-run -a npm test`. Set `VSCODE_VERSION=stable` to test the current stable
+release; the default is 1.140.0. CI runs both and uploads editor logs.
 
-Use `VSCODE_VERSION=stable npm test` to test the latest stable release. On Linux,
-run `xvfb-run -a npm test` to provide a display.
+The harness downloads a disposable editor and uses isolated profiles/extensions.
+It never patches the installed editor. Compilation, lint and the focused
+`node:test` regressions run first. Real extension-host runners export an awaited
+`run()` function through VS Code's custom runner interface: install, imports,
+buttons/theme/live status sizing, webview updates, reopen/disable, and independent
+restored startup. Application files are compared byte-for-byte before cleanup,
+so cleanup cannot mask a failed restoration.
 
-The GitHub Actions workflow tests both 1.140.0 and latest stable and uploads
-editor logs even when a test fails. Focused lifecycle and patch-transaction
-regressions run before real-editor tests. Those tests verify activation, CSS/JS
-imports in the actual workbench, live updates, reopening, repeated enable,
-buttons and live theme colors, disable, and startup after restoration. Application
-HTML and `main.js` are compared against their original bytes. All patching uses
-the downloaded editor.
+`test/public-api.test.js` covers command/terminal buttons, priority, configuration
+changes, removal, disable/re-enable, live theme colors and preservation, plus
+status height A→B→A. SCM counts and theme startup/token removal remain untested.
+`test/webview.integration.js` exercises the actual watcher/configuration path.
+`test/webview.run.js` additionally checks three CSP policies, theme changes and
+document recreation in a separate fixture extension.
 
-`test/lifecycle.test.js` and `test/modern.test.js` use `node:test` in a normal Node
-process. The five real-editor suites export an awaited `run()` function, following
-VS Code's [custom test runner interface](https://code.visualstudio.com/api/working-with-extensions/testing-extension#the-test-runner-script).
-They run sequentially in separate editor launches because patching takes effect
-on the next startup: activate/install, exercise imports, exercise public-API
-buttons/theme behavior, reopen/disable, and check restored startup.
-`test/public-api.test.js` checks startup/live button rendering, priority, command
-clicks, actual shell execution in an isolated terminal profile, cleanup on removal
-and disable, re-enable, and live color-token updates without losing unrelated
-user colors. SCM counts, initial theme application, and theme-token removal are
-outside that suite's coverage. Plain `node --test` cannot provide the real
-`vscode` module;
-using `node:test` inside the extension host would require an in-process runner
-that forwards failures to this `run()` promise. The current runners use strict
-assertions and rejected promises for that contract.
+The main harness also runs the measured-layout suite after restoration. To run
+that suite independently, use
+`APC_EDITOR='/path/to/disposable/editor' node test/customizations-run.js`.
+It checks fonts, row geometry, pointer/scroll behavior, header bounds, horizontal
+activity navigation, all status positions, panel handling, live changes and reset. Never supply
+the daily editor or an editor copy currently used by another test.
 
-## Modern compatibility implementation
+The macOS native-window/menu runner is separate:
+`node test/native.run.js '/path/to/disposable/Visual Studio Code.app'`.
+It creates its own APFS clone and checks actual window getters, sandboxing,
+mouse/keyboard menu interaction and exact restoration. Its platform-specific
+appearance assertions do not establish Windows/Linux support. Recorded macOS
+observations are in [test/evidence/native-findings.md](test/evidence/native-findings.md).
+Measured layout observations are in
+[test/evidence/customizations-findings.md](test/evidence/customizations-findings.md).
 
-### Porting steps and module mapping
+Ordinary `node --test` cannot provide the real `vscode` module. The editor runners
+use strict assertions and promise rejection through VS Code's runner contract;
+the pure preparation/lifecycle tests use `node:test` outside that host.
 
-VS Code's [ESM migration](https://code.visualstudio.com/updates/v1_94#_esm-is-shipping-for-vs-code)
-changed its internal startup/loading system. This port keeps the extension host
-in CommonJS; it replaces the assumptions about the application's internals:
+## Module-based port
 
-1. Resolve application files through `vscode.env.appRoot`, since `require.main`
-   can be undefined. Register commands before checking or modifying those files.
-2. Detect a module-based `workbench.js` startup tag under `electron-browser` or
-   `electron-sandbox`. Preserve that tag and inject a separate browser module,
-   with the required CSP/Trusted Types permissions.
-3. Read configuration/local imports in the extension host and publish a watched
-   snapshot. The renderer applies CSS and ordered scripts without AMD or private
-   VS Code services.
-4. Await installation/removal before persisting enabled state. Dispose watchers,
-   buttons, registered button commands, and SCM listeners on their lifecycle paths.
-5. Record backups/checksums and roll back failed writes; verify actual workbench
-   behavior and exact restoration in disposable editor installations.
+VS Code's ESM startup invalidated the old `require.main` and AMD assumptions.
+The extension host remains CommonJS; application paths come from
+`vscode.env.appRoot`. The old AMD patcher and bundled runtime have been removed.
+Unsupported startup/hooks fail preflight before writes. Historical implementations
+remain in Git history for comparison.
 
-`src/patch.ts` owns layout detection, import publication, application locking,
-transactional installation and restoration. `resources/modern-loader.js` runs
-the imports in the browser. It is shipped verbatim because the extension-host
-compiler targets CommonJS without DOM types.
+| Module | Responsibility |
+| --- | --- |
+| `src/extension.ts` | Commands, enabled state and awaited configuration handling |
+| `src/patch.ts` | Layout detection, lock, import publication, adapter composition, checksummed backups and rollback/restoration |
+| `src/customizations.ts`, `resources/customizations.js` | CSS plus semantic hooks for list measurements, headers and the workbench grid |
+| `src/native.ts`, `resources/native-loader.mjs` | Documented constructor options before `mainImpl`, explicit window setters and compact-menu normalization; preserves VS Code web preferences |
+| `src/webview.ts` | Safely serialized default CSS and exact inline-module CSP hash updates |
+| `resources/modern-loader.js` | Renderer imports, error isolation, unchanged user-script deduplication and repeatable internal configuration |
 
-The untested AMD fallback and its bundled runtime have been removed. Older
-editors that lack module-based workbench startup are rejected before writes.
-The previous implementation remains available in Git history for comparison.
+Adapters only prepare maps of absolute application paths to text. The patcher
+composes shared renderer changes in order and keeps originals independently.
+It snapshots every affected file, records build identity/checksums, publishes
+dependencies before startup entry points, and rolls back failed batches. The
+bounded file batch stays synchronous while holding the cross-process lock;
+an asynchronous rewrite would also need a serialized refresh/disposal queue.
 
-### Patch recovery
+The browser resources are editable source shipped verbatim. Passing them through
+the extension-host compiler would target CommonJS without DOM types. UI settings
+are also published as an internal configuration script that runs on every
+revision, including A→B→A; user scripts still execute once per unchanged file.
 
-Backups are checked against the editor version, workbench build, and original
-file hashes. APC refuses to restore a corrupt backup or overwrite files changed
-outside APC. Use a clean editor installation if the application build or backup
-has changed. A reported lock left after a crash can be removed after confirming
-that no other editor process is patching that installation.
+Webview CSS uses the application's existing trusted default stylesheet, which
+precedes an extension's CSP meta. The adapter updates the matching script-src
+hash without removing directives or widening resource/script origins. This is
+privileged application-template styling: it can override an extension author's
+styling restriction, and extension code can remove/override the style. Existing
+outer webview documents must be recreated to load changed template bytes.
 
-## Work required for the remaining customizations
+## Patch recovery
 
-This is an implementation assessment from the legacy modules, not a claim that
-these features work in the modern port. VS Code's public extension API
-[does not expose the workbench DOM](https://code.visualstudio.com/api/extension-capabilities/overview).
+Backups are checked against the editor version, workbench build and file hashes.
+APC refuses to restore corrupt backups or overwrite files changed outside APC.
+VS Code may show its modified-installation notice while these patches are active.
+Use a clean editor installation if the build/backup no longer matches. A reported
+lock left after a crash can be removed after confirming no other process is
+patching that installation. Disabling restores every tracked application file
+and removes generated sidecars; reload/restart afterward to unload running code.
 
-| Feature | Existing implementation | Modern implementation and acceptance checks needed |
-| --- | --- | --- |
-| Font families, part fonts, font sizes | `vs/modules/ui.js`, `main.css`, and the font override in `classes.js` | Port configuration/CSS variables and current selectors to the renderer. CSS can cover styling, but replacing the internal default font needs separate evaluation. Check computed fonts in each part, theme changes, and removal/reload. This is the smallest independent feature group. |
-| List rows and header dimensions | `classes.js`, `configuration.js`, and `main.css` | Port CSS plus virtualized-list/header measurements. CSS height alone can disagree with list scrolling and hit targets. Locate current internals or explicitly narrow support to visual styling; test scrolling, selection, resize, density changes, and restoration. |
-| Activity/status bar position and sizing | `layout.js`, `layout.activitybar.js`, `layout.statusbar.js`, and `override.js` | Replace AMD service lookup and grid/prototype interception, or limit settings to existing VS Code placements. Moving DOM alone does not update grid constraints. Validate panel/sidebar positions, resize, Zen/fullscreen modes, auxiliary windows, and disable. This requires a separate layout port. |
-| `apc.electron` | `vs/modules/patch.main.js` via the main-process AMD bootstrap | Find and preflight a modern main-process hook before `BrowserWindow` creation; the renderer cannot supply constructor options. Add versioned backup/rollback for every affected main-process file and test restart, window creation, and restore on each supported OS. This is a separate native-window patcher. |
-| Compact menubar | `classes.js`, `patch.js`, and `override.js` | Reassess current menu/titlebar implementations and native versus custom menu behavior. Port service/event/placement hooks where built-in menu settings are insufficient. Test keyboard access, overflow, titlebar modes, platform differences, and restoration. |
-| `apc.iframe.style` | `appendIframeStyle()` in `src/patch.ts`, which rewrites shared webview HTML and disables its CSP | Workbench CSS cannot cross into isolated webviews. Identify current webview entry points and CSP-compatible style injection without removing their CSP; integrate all affected files with transactional backup/restore. Test real webviews, reload/theme changes, other extensions' content, and disable. This needs a separate webview design. |
+## Coverage still needed
 
-Start with font/CSS-only options, then tackle measured lists/layout and native
-windows/webviews as separate feature changes. Each needs behavioral tests; the
-current import suite alone cannot validate those internal customizations.
-
-### Feasibility evidence
-
-The assessment above identifies candidate approaches from the old implementation.
-It does not demonstrate full feature parity on modern VS Code. Throwaway worktree
-prototypes are being used to distinguish observed behavior from assumptions before
-any production implementation is proposed.
+The current checks establish specific behavior on the recorded builds, not every
+combination of private workbench internals. Extend coverage for other list/SCM
+views, auxiliary windows, panel/sidebar combinations, Zen/fullscreen modes,
+every font selector, custom editors/Markdown previews/nested frames, and native
+appearance on each OS. Keep those gaps explicit in the README feature table.

@@ -74,7 +74,7 @@
       if (horizontal) {
         if (!horizontalStyle) {
           horizontalStyle = document.createElement('style');
-          horizontalStyle.textContent = '.monaco-workbench .part.activitybar.apc-horizontal-activitybar .monaco-action-bar .actions-container{display:flex !important;flex-direction:row !important;align-items:center}.monaco-workbench .part.activitybar.apc-horizontal-activitybar .content>.composite-bar{flex:1;min-width:0}.monaco-workbench .part.activitybar.apc-horizontal-activitybar .action-item{flex-shrink:0;margin-top:0 !important;margin-bottom:0 !important}';
+          horizontalStyle.textContent = '.monaco-workbench .part.activitybar.apc-horizontal-activitybar .monaco-action-bar .actions-container{display:flex !important;flex-direction:row !important;align-items:center}.monaco-workbench .part.activitybar.apc-horizontal-activitybar .content>.composite-bar{flex:1;min-width:0}.monaco-workbench .part.activitybar.apc-horizontal-activitybar .content>.menubar{width:auto !important;flex:0 0 auto;align-self:center}.monaco-workbench .part.activitybar.apc-horizontal-activitybar .action-item{flex-shrink:0;margin-top:0 !important;margin-bottom:0 !important}';
           document.head.appendChild(horizontalStyle);
         }
         activity.element.style.setProperty('width', 'calc(100% - 8px)', 'important');

@@ -77,7 +77,9 @@ export function customizationStyles(): string {
   const addFamily = (selector: string, value: unknown) => { const font = family(value); if (font) { rules.push(`${selector}{font-family:${font} !important}`); } };
   addFamily('.monaco-workbench', config['font.family']);
   const monospace = family(config['monospace.font.family']);
-  if (monospace) { rules.push(`.monaco-workbench{--monaco-monospace-font:${monospace}}`); }
+  if (monospace) {
+    rules.push(`.monaco-workbench,.monaco-workbench .shadow-root-host,.monaco-workbench .monaco-editor,.monaco-workbench .mac,.monaco-workbench .windows,.monaco-workbench .linux{--monaco-monospace-font:${monospace}}`);
+  }
   const parts = config['parts.font.family'] as Record<string, unknown> | undefined;
   const selectors: Record<string, string> = { 'monaco-menu': '.monaco-menu', banner: '.part.banner', titlebar: '.part.titlebar', statusbar: '.part.statusbar', panel: '.part.panel', 'extension-editor': '.extension-editor', 'settings-body': '.settings-body', auxiliarybar: '.part.auxiliarybar', tabs: '.tabs-container', sidebar: '.part.sidebar' };
   for (const [part, font] of Object.entries(parts ?? {})) {

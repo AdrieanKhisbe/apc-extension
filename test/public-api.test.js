@@ -29,6 +29,23 @@ exports.run = async function () {
     await eventually(async () => (await labels()).includes('APC check startup'), 'Configured startup button was not shown');
     await click('APC check startup');
     await eventually(() => clicks === 1, 'Status bar click did not invoke the configured VS Code command');
+    const fontFile = path.join(process.env.APC_FIXTURE, 'font-test.txt');
+    fs.writeFileSync(fontFile, 'APC monospace test');
+    await vscode.window.showTextDocument(await vscode.workspace.openTextDocument(vscode.Uri.file(fontFile)));
+    await eventually(() => cdp.evaluate(`getComputedStyle(document.querySelector('.monaco-editor')).getPropertyValue('--monaco-monospace-font').trim() === 'monospace'`), 'Monospace override did not reach the editor scope');
+    try {
+      await eventually(() => cdp.evaluate(`(() => { const bar = document.querySelector('.part.activitybar'); const grid = bar.parentElement.getBoundingClientRect(); return grid.height === 56 && grid.width === document.querySelector('.monaco-workbench').getBoundingClientRect().width && document.querySelectorAll('.part.activitybar .composite-bar .action-item').length >= 2; })()`), 'Configured bottom activity bar must reserve a full row and populate navigation with compact menus enabled');
+    } catch (error) {
+      console.log('ACTIVITY STARTUP DIAGNOSTIC', await cdp.evaluate(`(() => {const bar=document.querySelector('.part.activitybar');const grid=bar.parentElement.getBoundingClientRect();return {width:grid.width,height:grid.height,workbenchWidth:document.querySelector('.monaco-workbench').getBoundingClientRect().width,items:document.querySelectorAll('.part.activitybar .composite-bar .action-item').length,content:bar.innerHTML.slice(0,4000)};})()`));
+      throw error;
+    }
+    const menu = await cdp.evaluate(`(() => { const r = document.querySelector('.part.activitybar .menubar-menu-button').getBoundingClientRect(); return {x:r.x+r.width/2,y:r.y+r.height/2,width:r.width,height:r.height}; })()`);
+    assert.ok(menu.width >= 20 && menu.height >= 20, 'Compact menu must remain a usable pointer target in the bottom bar');
+    await cdp.send('Input.dispatchMouseEvent', { type: 'mousePressed', button: 'left', clickCount: 1, x: menu.x, y: menu.y });
+    await cdp.send('Input.dispatchMouseEvent', { type: 'mouseReleased', button: 'left', clickCount: 1, x: menu.x, y: menu.y });
+    await eventually(() => cdp.evaluate(`Array.from(document.querySelectorAll('.monaco-menu .action-label')).some(node => node.getBoundingClientRect().width > 0 && node.textContent.includes('File'))`), 'Compact menu did not open from the horizontal activity bar');
+    await cdp.send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 });
+    await cdp.send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 });
 
     await update('apc.buttons', [
       { text: 'APC check high', tooltip: 'APC test tooltip', vscommand: 'apc.test.button', priority: 100 },
