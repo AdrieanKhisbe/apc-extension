@@ -68,7 +68,7 @@ export function prepareWebview(_context: vscode.ExtensionContext, originals: Rea
   once(script[1], /newDocument\.head\.prepend\(defaultStyles\.cloneNode\(true\)\);/g, 'default stylesheet insertion');
   const replacement = defaults[0] + `\n\t\t${marker}\n\t\tdefaultStyles.textContent += ${scriptString('\n' + style)};`;
   const updatedScript = script[1].replace(defaults[0], () => replacement);
-  const updatedPolicy = policy[2].replace(oldHash, `'sha256-${digest(updatedScript)}'`);
+  const updatedPolicy = policy[2].replace(rules[0], () => rules[0].replace(oldHash, `'sha256-${digest(updatedScript)}'`));
   // The existing trusted default stylesheet precedes each extension's CSP. This
   // is privileged application styling; extension CSS/DOM can still override it.
   const updated = original.replace(script[0], () => script[0].replace(script[1], () => updatedScript))

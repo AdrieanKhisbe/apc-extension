@@ -70,6 +70,16 @@ test('CSS containing JavaScript/HTML delimiters remains literal stylesheet data'
   assert.ok(inserted.textContent.endsWith('\n' + css));
 });
 
+test('hash replacement is confined to script-src when another directive uses the same hash', t => {
+  const f = fixture(t);
+  const hash = `'sha256-${digest(script)}'`;
+  fs.writeFileSync(f.file, f.original.replace(/content="[^"]*"/, `content="default-src 'none'; style-src ${hash}; script-src ${hash} 'self';"`));
+  f.config.set('apc.iframe.style', { body: 'color: red;' });
+  const patched = f.prepare().get(f.file);
+  assert.ok(patched.includes(`style-src ${hash};`));
+  assert.ok(!patched.includes(`script-src ${hash}`));
+});
+
 test('file updates are re-read and missing/relative/invalid style configurations fail before writes', t => {
   const f = fixture(t);
   const source = path.join(f.root, 'style.css'); fs.writeFileSync(source, 'body { color: red; }');

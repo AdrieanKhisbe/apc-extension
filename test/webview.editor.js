@@ -12,10 +12,10 @@ exports.run = async () => {
   const settings = vscode.workspace.getConfiguration();
   const reports = [];
   const expected = { baseline: '', installed: 'installed', 'file-updated': 'file-updated', restored: '' }[phase];
-  const script = `<script nonce="fixture-script">const api = acquireVsCodeApi(); addEventListener('message', event => { if (event.data === 'remove-default-style') document.getElementById('_defaultStyles')?.remove(); }); setInterval(() => api.postMessage({ marker: getComputedStyle(document.body).getPropertyValue('--apc-webview-test').trim(), owned: getComputedStyle(document.body).getPropertyValue('--owned-style').trim(), csp: document.querySelector('meta[http-equiv="Content-Security-Policy"]').content, blockedScriptRan: !!globalThis.__blockedScriptRan, topDocumentAccessible: (() => { try { return !!top.document.body; } catch { return false; } })(), theme: document.body.dataset.vscodeThemeKind }), 150);</script>`;
+  const script = `<script nonce="fixture-script">const api = acquireVsCodeApi(); addEventListener('message', event => { if (event.data === 'remove-default-style') document.getElementById('_defaultStyles')?.remove(); }); setInterval(() => api.postMessage({ generation: document.body.dataset.fixtureGeneration, marker: getComputedStyle(document.body).getPropertyValue('--apc-webview-test').trim(), owned: getComputedStyle(document.body).getPropertyValue('--owned-style').trim(), csp: document.querySelector('meta[http-equiv="Content-Security-Policy"]').content, blockedScriptRan: !!globalThis.__blockedScriptRan, topDocumentAccessible: (() => { try { return !!top.document.body; } catch { return false; } })(), theme: document.body.dataset.vscodeThemeKind }), 150);</script>`;
   for (const policy of ["'unsafe-inline'", "'nonce-owned-style'", "'none'"]) {
     const csp = `default-src 'none'; script-src 'nonce-fixture-script'; style-src ${policy};`;
-    const html = `<html><head><meta http-equiv="Content-Security-Policy" content="${csp}"><style nonce="owned-style">body { --owned-style: works; }</style></head><body>Webview fixture<script>globalThis.__blockedScriptRan = true;</script>${script}</body></html>`;
+    const html = `<html><head><meta http-equiv="Content-Security-Policy" content="${csp}"><style nonce="owned-style">body { --owned-style: works; }</style></head><body data-fixture-generation="initial">Webview fixture<script>globalThis.__blockedScriptRan = true;</script>${script}</body></html>`;
     const panel = vscode.window.createWebviewPanel('apc-webview-fixture', 'APC webview test', vscode.ViewColumn.One, { enableScripts: true });
     const messages = [];
     const listener = panel.webview.onDidReceiveMessage(message => messages.push(message));
@@ -35,8 +35,8 @@ exports.run = async () => {
         messages.length = 0; await panel.webview.postMessage('remove-default-style');
         removed = await wait(message => message.marker === '');
       }
-      messages.length = 0; panel.webview.html = html.replace('fixture<script>', 'recreated fixture<script>');
-      const recreated = await wait(message => message.csp === csp);
+      messages.length = 0; panel.webview.html = html.replace('data-fixture-generation="initial"', 'data-fixture-generation="recreated"');
+      const recreated = await wait(message => message.csp === csp && message.generation === 'recreated');
       assert.equal(recreated.marker, expected);
       reports.push({ policy, initial, themed, removed, recreated });
     } finally { listener.dispose(); panel.dispose(); }
