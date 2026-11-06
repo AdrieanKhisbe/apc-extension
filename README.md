@@ -31,7 +31,7 @@ latest stable release; the old AMD implementation has been removed.
 | `apc.stylesheet` | ✅ Live configuration updates | ✅ Real-editor changes and removal |
 | Live local file updates | ✅ Including atomic saves | ✅ Real-editor CSS/JS updates and unchanged-script deduplication |
 | `apc.buttons` | ✅ Status-bar commands and terminal buttons | 🟡 Automated startup, clicks, updates, priority, terminal execution, cleanup and re-enable; SCM counts untested |
-| `apc.theme` | 🟡 Applies color tokens on configuration changes | 🟡 Automated live colors, preservation and disabled-state gating; startup/removal not covered |
+| `apc.theme` | ✅ Startup/live colors and persistent restoration on removal/disable | ✅ Lifecycle, reopening, manual-edit preservation, interrupted writes, renderer colors and disabled-state gating |
 | Font overrides | ✅ Global, monospace and per-part styles | 🟡 Computed global/part fonts and removal; not every selector or font combination |
 | List row/header dimensions | ✅ Virtualized measurements, font sizes and tab/sidebar headers | 🟡 Explorer geometry, pointer selection, scrolling, live updates and reset; other list types need coverage |
 | Activity/status bar layout | ✅ Measured sizing, horizontal bottom activity bar and four status positions | 🟡 Grid bounds, mouse/keyboard navigation, live changes, bottom-panel handling and reset; other layout combinations need coverage |
@@ -41,6 +41,12 @@ latest stable release; the old AMD implementation has been removed.
 ✅ = implemented or automated checks passed for the stated scope; 🟡 = partial
 implementation or coverage. Native-window visual checks cover VS Code 1.140.0 and 1.143.1 on macOS
 ARM64. Unknown internal layouts are rejected before application files are changed.
+
+`apc.theme` overrides only the listed global color tokens. Removing tokens or
+disabling APC restores their previous values, including across editor restarts;
+later manual edits are preserved. An absent or empty theme applies no palette.
+Colors written by earlier APC versions have no saved baseline and cannot be
+automatically recovered.
 
 - **Reload after enabling/disabling APC**, first enabling layout hooks, adding
   remote import origins, or removing JavaScript effects. Later UI/CSS edits update

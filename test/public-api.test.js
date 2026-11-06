@@ -90,8 +90,11 @@ exports.run = async function () {
     // A configuration read after the next event turn checks disabled-state gating.
     await new Promise(resolve => setTimeout(resolve, 500));
     assert.deepEqual(await labels(), [], 'Disabled APC must not recreate buttons');
-    assert.equal(colors()['statusBar.background'], '#654321', 'Disabled APC must not publish theme edits');
+    assert.deepEqual(colors(), { 'editor.background': '#102030' }, 'Disable must restore colors and ignore subsequent theme edits');
     await vscode.commands.executeCommand('apc.extension.enable');
+    await eventually(async () => (await cssColor('statusBar.background')) === '#abcdef', 'Re-enable must apply the current theme immediately');
+    await update('apc.theme', []);
+    await eventually(() => JSON.stringify(colors()) === JSON.stringify({ 'editor.background': '#102030' }), 'Removing all theme tokens must restore previous colors');
     await eventually(async () => (await labels()).includes('APC check reenable'), 'Re-enable must recreate configured buttons');
     await click('APC check reenable');
     await eventually(() => clicks === 3, 'Re-enabled button command did not run');

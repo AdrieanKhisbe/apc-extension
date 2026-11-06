@@ -1,36 +1,31 @@
 import * as vscode from 'vscode';
 
 import { applyButtons, disposeButtons } from './buttons/button';
-import * as customizations from './customizations.json';
+import { createThemeManager, ThemeManager } from './theme';
 import { ensurePatch, uninstallPatch, install, disposePatch, updateImports } from './patch';
-
-async function changeTheme() {
-  const config = vscode.workspace.getConfiguration();
-  const apcTheme = config.get<Array<{ color: string; tokens: string[]; }>>('apc.theme');
-  const colorCustomizations = config.get<any>('workbench.colorCustomizations') || {};
-  const customeTheme = apcTheme || customizations.theme;
-  customeTheme.forEach(({ color, tokens }) => {
-    tokens.forEach(token => {
-      colorCustomizations[token] = color;
-    });
-  });
-  await config.update('workbench.colorCustomizations', colorCustomizations, true);
-}
 
 function reportError(error: unknown) {
   const message = error instanceof Error ? error.message : String(error);
   void vscode.window.showErrorMessage(`Apc Extension failed: ${message}`);
 }
 
-type RuntimeState = { isRunning: boolean };
+type RuntimeState = { isRunning: boolean; theme: ThemeManager };
 
-async function apcEnable(context: vscode.ExtensionContext, state: RuntimeState) {
+async function apcEnable(context: vscode.ExtensionContext, state: RuntimeState, startup = false) {
+  let installed = false;
+  const wasRunning = state.isRunning;
   try {
-    await install(context);
+    await (startup ? ensurePatch(context) : install(context));
+    installed = true;
+    await state.theme.apply();
     await context.globalState.update('isEnabled', true);
     state.isRunning = true;
     applyButtons(context);
   } catch (error) {
+    if (installed && !wasRunning) {
+      try { await uninstallPatch(); await state.theme.restore(); }
+      catch (rollbackError) { reportError(rollbackError); }
+    }
     reportError(error);
     throw error;
   }
@@ -39,6 +34,7 @@ async function apcEnable(context: vscode.ExtensionContext, state: RuntimeState) 
 async function apcDisable(context: vscode.ExtensionContext, state: RuntimeState) {
   try {
     await uninstallPatch();
+    await state.theme.restore();
     await context.globalState.update('isEnabled', false);
     state.isRunning = false;
     disposeButtons();
@@ -49,7 +45,7 @@ async function apcDisable(context: vscode.ExtensionContext, state: RuntimeState)
 }
 
 export async function activate(context: vscode.ExtensionContext) {
-  const state: RuntimeState = { isRunning: false };
+  const state: RuntimeState = { isRunning: false, theme: createThemeManager(context) };
   context.subscriptions.push({ dispose: disposePatch }, { dispose: disposeButtons });
   context.subscriptions.push(vscode.commands.registerCommand('apc.extension.enable', () => apcEnable(context, state)));
   context.subscriptions.push(vscode.commands.registerCommand('apc.extension.disable', () => apcDisable(context, state)));
@@ -57,7 +53,7 @@ export async function activate(context: vscode.ExtensionContext) {
   async function onDidChangeConfiguration(e: vscode.ConfigurationChangeEvent) {
     if (!state.isRunning || context.globalState.get('isEnabled') !== true) { return; }
     try {
-      if (e.affectsConfiguration('apc.theme')) { await changeTheme(); }
+      if (e.affectsConfiguration('apc.theme')) { await state.theme.apply(); }
       if (e.affectsConfiguration('apc.buttons')) { applyButtons(context); }
       const patchSettings = ['apc.imports', 'apc.stylesheet', 'apc.iframe.style', 'apc.electron', 'apc.menubar.compact',
         'apc.font.family', 'apc.monospace.font.family', 'apc.parts.font.family', 'apc.listRow',
@@ -73,14 +69,9 @@ export async function activate(context: vscode.ExtensionContext) {
   // Commands remain registered even when the application's layout is unsupported
   // or patching fails. Handle startup failures instead of rejecting activation.
   if (context.globalState.get('isEnabled') !== false) {
-    try {
-      await ensurePatch(context);
-      await context.globalState.update('isEnabled', true);
-      state.isRunning = true;
-    } catch (error) { reportError(error); }
+    try { await apcEnable(context, state, true); }
+    catch { /* apcEnable reports startup failures; commands remain available. */ }
   }
-
-  applyButtons(context);
 }
 
 export function deactivate() {

@@ -12,7 +12,8 @@ function harness(options = {}) {
   const initialState = Object.hasOwn(options, 'initialState') ? options.initialState : false;
   const commands = new Map();
   const errors = [];
-  const state = new Map([['isEnabled', initialState]]);
+  const state = options.state || new Map([['isEnabled', initialState]]);
+  const settings = options.settings || new Map();
   let configurationListener;
   const disposable = { dispose() {} };
   const context = {
@@ -20,16 +21,28 @@ function harness(options = {}) {
     subscriptions: [],
     globalState: {
       get: key => state.get(key),
-      update: async (key, value) => { state.set(key, value); },
+      update: async (key, value) => { await options.beforeStateUpdate?.(key, value); state.set(key, structuredClone(value)); },
     },
   };
   const vscode = {
+    ConfigurationTarget: { Global: 1 },
     env: { appRoot },
     version: '1.140.0',
     commands: { registerCommand: (name, fn) => (commands.set(name, fn), disposable) },
     window: { showErrorMessage: message => (errors.push(message), Promise.resolve()) },
     workspace: {
-      getConfiguration: () => ({ get: () => undefined }),
+      getConfiguration: section => {
+        const full = key => section ? section + '.' + key : key;
+        return {
+          get: key => structuredClone(full(key) === 'workbench.colorCustomizations' && options.mergedColors ? options.mergedColors : settings.get(full(key))),
+          inspect: key => ({ globalValue: structuredClone(settings.get(full(key))) }),
+          update: async (key, value, target) => {
+            assert.equal(target, 1, 'Theme writes must target global settings');
+            await options.beforeSettingsUpdate?.(full(key), value);
+            value === undefined ? settings.delete(full(key)) : settings.set(full(key), structuredClone(value));
+          },
+        };
+      },
       onDidChangeConfiguration: listener => (configurationListener = listener, disposable),
       onDidChangeWorkspaceFolders: () => disposable,
     },
@@ -58,11 +71,12 @@ function harness(options = {}) {
     disposePatch: () => {}, updateImports: async () => {}, ...patch,
   };
   return {
-    commands, errors, state, context,
+    commands, errors, state, settings, context,
     extension: () => load(path.resolve(__dirname, '../dist/extension.js'), {
       './patch': patchStub, './utils': { promptRestart() {} },
     }),
     realPatch: () => load(path.resolve(__dirname, '../dist/patch.js')),
+    theme: () => load(path.resolve(__dirname, '../dist/theme.js')).createThemeManager(context),
     changeConfiguration: (setting = 'apc.iframe.style') => configurationListener({ affectsConfiguration: key => key === setting }),
   };
 }
@@ -82,6 +96,49 @@ test('modern installation preflight rejects before writing any application files
   }
 });
 
+test('configured theme applies at startup and disable restores the previous global colors', async () => {
+  const original = { 'statusBar.background': '#112233', 'editor.background': '#445566' };
+  const h = harness({ initialState: true, settings: new Map([
+    ['apc.theme', [{ color: '#abcdef', tokens: ['statusBar.background'] }]],
+    ['workbench.colorCustomizations', original],
+  ]) });
+  await h.extension().activate(h.context);
+  assert.equal(h.settings.get('workbench.colorCustomizations')['statusBar.background'], '#abcdef');
+  assert.equal(h.settings.get('workbench.colorCustomizations')['editor.background'], '#445566');
+  await h.commands.get('apc.extension.disable')();
+  assert.deepEqual(h.settings.get('workbench.colorCustomizations'), original);
+});
+
+test('removing theme tokens restores original values and removes newly introduced colors', async () => {
+  const h = harness({ initialState: true, settings: new Map([
+    ['apc.theme', [{ color: '#abcdef', tokens: ['statusBar.background', 'sideBar.background'] }]],
+    ['workbench.colorCustomizations', { 'statusBar.background': '#112233' }],
+  ]) });
+  await h.extension().activate(h.context);
+  h.settings.set('apc.theme', [{ color: '#654321', tokens: ['sideBar.background'] }]);
+  await h.changeConfiguration('apc.theme');
+  assert.deepEqual(h.settings.get('workbench.colorCustomizations'), { 'statusBar.background': '#112233', 'sideBar.background': '#654321' });
+  h.settings.delete('apc.theme');
+  await h.changeConfiguration('apc.theme');
+  assert.deepEqual(h.settings.get('workbench.colorCustomizations'), { 'statusBar.background': '#112233' });
+});
+
+test('theme ownership survives reopening and preserves manual user color edits on disable', async () => {
+  const settings = new Map([
+    ['apc.theme', [{ color: '#abcdef', tokens: ['statusBar.background', 'sideBar.background'] }]],
+    ['workbench.colorCustomizations', { 'statusBar.background': '#112233' }],
+  ]);
+  const first = harness({ initialState: true, settings });
+  await first.extension().activate(first.context);
+  settings.set('apc.theme', [{ color: '#654321', tokens: ['statusBar.background', 'sideBar.background'] }]);
+  const reopened = harness({ settings, state: first.state });
+  await reopened.extension().activate(reopened.context);
+  assert.equal(settings.get('workbench.colorCustomizations')['statusBar.background'], '#654321');
+  settings.set('workbench.colorCustomizations', { ...settings.get('workbench.colorCustomizations'), 'sideBar.background': '#fedcba' });
+  await reopened.commands.get('apc.extension.disable')();
+  assert.deepEqual(settings.get('workbench.colorCustomizations'), { 'statusBar.background': '#112233', 'sideBar.background': '#fedcba' });
+});
+
 test('startup patch failure leaves activation and both commands available', async () => {
   const h = harness({ initialState: undefined, patch: {
     ensurePatch: async () => { throw new Error('unsupported editor'); },
@@ -90,6 +147,103 @@ test('startup patch failure leaves activation and both commands available', asyn
   assert.equal(h.commands.size, 2);
   assert.equal(h.state.get('isEnabled'), undefined);
   assert.match(h.errors.join('\n'), /unsupported editor/);
+});
+
+test('theme removal restores unset and empty settings without applying an implicit palette', async () => {
+  for (const baseline of [undefined, {}]) {
+    const settings = new Map();
+    if (baseline !== undefined) { settings.set('workbench.colorCustomizations', baseline); }
+    const h = harness({ settings });
+    const theme = h.theme();
+    await theme.apply();
+    assert.deepEqual(settings.get('workbench.colorCustomizations'), baseline);
+    settings.set('apc.theme', [{ color: '#123456', tokens: ['statusBar.background'] }]);
+    await theme.apply();
+    settings.set('apc.theme', []);
+    await theme.apply();
+    assert.deepEqual(settings.get('workbench.colorCustomizations'), baseline);
+    assert.equal(h.state.get('themeOverrides'), undefined);
+  }
+});
+
+test('theme journal recovers interrupted application and removal', async () => {
+  for (const failure of ['settings', 'commit', 'remove-settings', 'remove-commit']) {
+    let armed = false;
+    const settings = new Map([
+      ['apc.theme', [{ color: '#abcdef', tokens: ['statusBar.background'] }]],
+      ['workbench.colorCustomizations', { 'statusBar.background': '#112233', '[Dark]': { 'editor.background': '#000000' } }],
+    ]);
+    const original = structuredClone(settings.get('workbench.colorCustomizations'));
+    const h = harness({ settings,
+      beforeSettingsUpdate: () => { if (armed && failure.endsWith('settings')) { armed = false; throw new Error('write interrupted'); } },
+      beforeStateUpdate: (key, value) => {
+        if (armed && failure.endsWith('commit') && key === 'themeOverrides' && (!value || Object.values(value.tokens).every(record => !record.pending))) {
+          armed = false; throw new Error('commit interrupted');
+        }
+      },
+    });
+    const theme = h.theme();
+    if (failure.startsWith('remove-')) { await theme.apply(); }
+    armed = true;
+    await assert.rejects(() => failure.startsWith('remove-') ? theme.restore() : theme.apply(), /interrupted/);
+    assert.ok(h.state.get('themeOverrides'), 'Ownership must survive an interrupted write');
+    await harness({ settings, state: h.state }).theme().restore();
+    assert.deepEqual(settings.get('workbench.colorCustomizations'), original, failure);
+    assert.equal(h.state.get('themeOverrides'), undefined);
+  }
+});
+
+test('theme validation rejects bad input without modifying user colors', async () => {
+  for (const value of [null, {}, [{ color: '#fff', tokens: ['__proto__'] }], [{ color: '', tokens: ['statusBar.background'] }]]) {
+    const settings = new Map([['apc.theme', value], ['workbench.colorCustomizations', { 'editor.background': '#123456' }]]);
+    const h = harness({ settings });
+    await assert.rejects(() => h.theme().apply(), /apc.theme/);
+    assert.deepEqual(settings.get('workbench.colorCustomizations'), { 'editor.background': '#123456' });
+    assert.equal(h.state.get('themeOverrides'), undefined);
+  }
+});
+
+test('theme operations serialize and recover after a rejected write', async () => {
+  let reject = true;
+  const h = harness({ settings: new Map([['apc.theme', [{ color: '#fff', tokens: ['statusBar.background'] }]]]),
+    beforeSettingsUpdate: () => { if (reject) { reject = false; throw new Error('settings unavailable'); } },
+  });
+  const theme = h.theme();
+  const first = theme.apply();
+  const second = theme.apply();
+  const restore = theme.restore();
+  await assert.rejects(() => first, /settings unavailable/);
+  await second;
+  await restore;
+  assert.equal(h.settings.get('workbench.colorCustomizations'), undefined);
+});
+
+test('theme writes do not promote workspace colors into global settings', async () => {
+  const h = harness({
+    mergedColors: { 'editor.background': '#workspace' },
+    settings: new Map([['apc.theme', [{ color: '#123456', tokens: ['statusBar.background'] }]]]),
+  });
+  await h.theme().apply();
+  assert.deepEqual(h.settings.get('workbench.colorCustomizations'), { 'statusBar.background': '#123456' });
+  await h.theme().restore();
+  assert.equal(h.settings.get('workbench.colorCustomizations'), undefined);
+});
+
+test('failed theme application rolls back installation and keeps enable retryable', async () => {
+  let removals = 0; let fail = true;
+  const h = harness({
+    settings: new Map([['apc.theme', [{ color: '#123456', tokens: ['statusBar.background'] }]]]),
+    beforeSettingsUpdate: () => { if (fail) { throw new Error('colors locked'); } },
+    patch: { uninstallPatch: async () => { removals++; } },
+  });
+  await h.extension().activate(h.context);
+  await assert.rejects(() => h.commands.get('apc.extension.enable')(), /colors locked/);
+  assert.equal(removals, 1);
+  assert.equal(h.state.get('isEnabled'), false);
+  fail = false;
+  await h.commands.get('apc.extension.enable')();
+  assert.equal(h.state.get('isEnabled'), true);
+  assert.equal(h.settings.get('workbench.colorCustomizations')['statusBar.background'], '#123456');
 });
 
 test('commands are registered before startup patching finishes', async () => {
