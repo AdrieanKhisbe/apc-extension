@@ -60,8 +60,10 @@ export async function activate(context: vscode.ExtensionContext) {
     try {
       if (e.affectsConfiguration('apc.theme')) { await changeTheme(); }
       if (e.affectsConfiguration('apc.buttons')) { applyButtons(context); }
-      if (e.affectsConfiguration('apc.imports') || e.affectsConfiguration('apc.stylesheet')) { await updateImports(context); }
-      if (e.affectsConfiguration('apc.iframe.style')) { await updateImports(context); }
+      const patchSettings = ['apc.imports', 'apc.stylesheet', 'apc.iframe.style', 'apc.electron', 'apc.menubar.compact',
+        'apc.font.family', 'apc.monospace.font.family', 'apc.parts.font.family', 'apc.listRow',
+        'apc.header', 'apc.sidebar.titlebar', 'apc.activityBar', 'apc.statusBar'];
+      if (patchSettings.some(key => e.affectsConfiguration(key))) { await updateImports(context); }
       if (e.affectsConfiguration('apc.electron') || e.affectsConfiguration('apc.menubar.compact')) { await promptRestart(); }
     } catch (error) { reportError(error); }
   }

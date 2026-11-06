@@ -41,7 +41,7 @@ if (!globalThis[key]) {
           const url = new URL(entry.src, root).href;
           // CSS edits/config refreshes must not re-evaluate unchanged scripts.
           // Arbitrary JS side effects need a window reload to be undone.
-          if (executed.has(url)) { continue; }
+          if (!entry.repeat && executed.has(url)) { continue; }
           const node = document.createElement('script');
           for (const [name, value] of Object.entries(entry.attributes || {})) { node.setAttribute(name, value); }
           node.async = false;
@@ -57,7 +57,7 @@ if (!globalThis[key]) {
               document.head.appendChild(node);
             });
           } finally { removeEventListener('error', onError); }
-          executed.add(url);
+          if (!entry.repeat) { executed.add(url); }
         }
       } catch (error) { console.error('APC import failed:', entry.source || entry.src || 'stylesheet', error); }
     }

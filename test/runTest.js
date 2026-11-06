@@ -29,6 +29,14 @@ async function main() {
   const original = fs.readFileSync(htmlPath);
   const mainPath = path.join(appRoot, 'out/main.js');
   const originalMain = fs.readFileSync(mainPath);
+  const implementationPath = path.join(appRoot, 'out/mainImpl.js');
+  const originalImplementation = fs.readFileSync(implementationPath);
+  const desktopPath = path.join(appRoot, 'out/vs/workbench/workbench.desktop.main.js');
+  const originalDesktop = fs.readFileSync(desktopPath);
+  const nativeLoaderPath = path.join(appRoot, 'out/apc-native-loader.mjs');
+  assert.ok(!fs.existsSync(nativeLoaderPath), 'Downloaded editor has a leftover native bootstrap');
+  const webviewPath = path.join(appRoot, 'out/vs/workbench/contrib/webview/browser/pre/index.html');
+  const originalWebview = fs.readFileSync(webviewPath);
   const patchDirectory = path.join(workbench, 'apc-extension');
   assert.ok(!fs.existsSync(patchDirectory), 'Downloaded editor has leftover APC files; use a fresh test download');
   const fixture = path.join(profile, 'fixtures');
@@ -36,6 +44,10 @@ async function main() {
   fs.writeFileSync(path.join(fixture, 'style.css'), 'body { --apc-test-color: baseline; }');
   fs.writeFileSync(path.join(fixture, 'first.js'), 'globalThis.__apcTestRuns = (globalThis.__apcTestRuns || 0) + 1; globalThis.__apcOrder = ["first"];');
   fs.writeFileSync(path.join(fixture, 'second.js'), 'globalThis.__apcOrder.push("second");');
+  const webviewStyle = path.join(fixture, 'webview.css');
+  fs.writeFileSync(webviewStyle, 'body { --apc-webview-test: baseline; }');
+  const webviewBackup = path.join(fixture, 'original-webview.html');
+  fs.writeFileSync(webviewBackup, originalWebview);
   const { pathToFileURL } = require('node:url');
   const imports = ['style.css', 'first.js', 'second.js'].map(name => pathToFileURL(path.join(fixture, name)).href);
   const external = http.createServer((request, response) => {
@@ -57,6 +69,12 @@ async function main() {
   fs.writeFileSync(path.join(profile, 'user-data/User/settings.json'), JSON.stringify({
     'apc.imports': imports,
     'apc.buttons': [{ text: 'APC check startup', vscommand: 'apc.test.button' }],
+    'apc.iframe.style': webviewStyle,
+    'apc.electron': { opacity: 0.95 },
+    'apc.menubar.compact': true,
+    'apc.font.family': 'Georgia',
+    'apc.parts.font.family': { statusbar: 'monospace' },
+    'apc.statusBar': { height: 30 },
   }));
   const server = net.createServer();
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
@@ -64,7 +82,7 @@ async function main() {
   await new Promise(resolve => server.close(resolve));
   console.log(`Testing VS Code ${version}; isolated data: ${profile}`);
   try {
-    for (const suite of ['activation.test.js', 'imports.test.js', 'public-api.test.js', 'reload.test.js', 'disabled.test.js']) {
+    for (const suite of ['activation.test.js', 'imports.test.js', 'public-api.test.js', 'webview.integration.js', 'reload.test.js', 'disabled.test.js']) {
       console.log(`Running real-editor suite: ${suite}`);
       await runTests({
         vscodeExecutablePath,
@@ -72,7 +90,7 @@ async function main() {
         // launch. Do not load APC as a fresh install in the restoration control.
         extensionDevelopmentPath: suite === 'disabled.test.js' ? driver : root,
         extensionTestsPath: path.join(__dirname, suite),
-        extensionTestsEnv: { APC_CDP_PORT: String(port), APC_FIXTURE: fixture, APC_HTML: htmlPath, APC_ORIGINAL_HTML: original.toString('base64') },
+        extensionTestsEnv: { APC_CDP_PORT: String(port), APC_FIXTURE: fixture, APC_HTML: htmlPath, APC_ORIGINAL_HTML: original.toString('base64'), APC_WEBVIEW_TEMPLATE: webviewPath, APC_WEBVIEW_BACKUP: webviewBackup },
         launchArgs: [
           `--user-data-dir=${path.join(profile, 'user-data')}`,
           `--extensions-dir=${path.join(profile, 'extensions')}`,
@@ -86,11 +104,20 @@ async function main() {
       });
     }
     assert.deepEqual(fs.readFileSync(htmlPath), original, 'Disable must restore the original HTML byte-for-byte');
-    assert.deepEqual(fs.readFileSync(mainPath), originalMain, 'Modern patching must not modify main.js');
+    assert.deepEqual(fs.readFileSync(mainPath), originalMain, 'Disable must restore main.js');
+    assert.deepEqual(fs.readFileSync(implementationPath), originalImplementation, 'Disable must restore mainImpl.js');
+    assert.deepEqual(fs.readFileSync(desktopPath), originalDesktop, 'Disable must restore the renderer bundle');
+    assert.ok(!fs.existsSync(nativeLoaderPath), 'Disable must remove the native bootstrap');
+    assert.deepEqual(fs.readFileSync(webviewPath), originalWebview, 'Disable must restore the exact webview template');
     assert.ok(!fs.existsSync(patchDirectory), 'Disable must remove all modern patch files');
   } finally {
     // Also restore the disposable application if a suite fails before disable.
     fs.writeFileSync(htmlPath, original);
+    fs.writeFileSync(mainPath, originalMain);
+    fs.writeFileSync(implementationPath, originalImplementation);
+    fs.writeFileSync(desktopPath, originalDesktop);
+    if (fs.existsSync(nativeLoaderPath)) { fs.unlinkSync(nativeLoaderPath); }
+    fs.writeFileSync(webviewPath, originalWebview);
     if (fs.existsSync(patchDirectory)) { fs.rmSync(patchDirectory, { recursive: true, force: true }); }
     const logs = path.join(profile, 'user-data', 'logs');
     if (fs.existsSync(logs)) {

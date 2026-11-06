@@ -5,6 +5,7 @@ const path = require('node:path');
 const vm = require('node:vm');
 const { test } = require('node:test');
 const { pathToFileURL } = require('node:url');
+const { createHash } = require('node:crypto');
 
 const html = `<!DOCTYPE html><html><head><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; trusted-types existingPolicy;"></head><body></body><script src="./workbench.js" type="module"></script></html>`;
 
@@ -17,7 +18,7 @@ function fixture(t) {
   const config = new Map([['apc.imports', []]]);
   const vscode = {
     env: { appRoot: root }, version: '1.140.0',
-    workspace: { getConfiguration: () => ({ get: key => config.get(key) }) },
+    workspace: { getConfiguration: section => ({ get: key => config.get(section ? section + '.' + key : key) }) },
     window: { showInformationMessage: () => Promise.resolve(), showErrorMessage() {} },
   };
   let fault;
@@ -82,7 +83,8 @@ test('local file URLs, absolute paths, object imports, and stylesheet preserve o
   f.config.set('apc.stylesheet', { body: { color: 'blue' } });
   f.modern.install(f.context);
   const { entries } = f.publication();
-  assert.deepEqual(entries.map(item => item.kind), ['css', 'js', 'css', 'css']);
+  assert.deepEqual(entries.map(item => item.kind), ['css', 'js', 'css', 'css', 'js']);
+  assert.equal(entries[4].source, 'APC customization configuration');
   assert.equal(entries[0].text, 'body { color: red; }');
   assert.match(entries[1].src, /^script-[a-f0-9]{64}\.js$/);
   assert.match(entries[3].text, /color: blue/);
@@ -194,4 +196,122 @@ test('a queued file event cannot reinstall APC after its watcher is disposed', a
   await new Promise(resolve => setTimeout(resolve, 150));
   assert.equal(f.currentHtml(), html);
   assert.ok(!fs.existsSync(path.join(f.base, 'apc-extension')));
+});
+
+function webviewFixture(f) {
+  const file = path.join(f.root, 'out/vs/workbench/contrib/webview/browser/pre/index.html');
+  const script = `const defaultStyles = document.createElement('style');
+defaultStyles.id = '_defaultStyles';
+defaultStyles.textContent = \`blockquote { color: black; }\`;
+newDocument.head.prepend(defaultStyles.cloneNode(true));`;
+  const hash = createHash('sha256').update(script).digest('base64');
+  const original = `<html><head><meta http-equiv="Content-Security-Policy" content="script-src 'sha256-${hash}';"></head><script async type="module">${script}</script></html>`;
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  fs.writeFileSync(file, original);
+  return { file, original };
+}
+
+test('webview configuration and atomic file saves participate in publication and exact restoration', async t => {
+  const f = fixture(t);
+  const webview = webviewFixture(f);
+  const style = path.join(f.root, 'webview.css');
+  fs.writeFileSync(style, 'body { color: red; }');
+  f.config.set('apc.iframe.style', style);
+  f.modern.install(f.context);
+  assert.match(fs.readFileSync(webview.file, 'utf8'), /body \{ color: red;/);
+  fs.writeFileSync(style + '.tmp', 'body { color: blue; }');
+  fs.renameSync(style + '.tmp', style);
+  f.watchCallbacks.at(-1)('rename', path.basename(style));
+  await new Promise(resolve => setTimeout(resolve, 120));
+  assert.match(fs.readFileSync(webview.file, 'utf8'), /body \{ color: blue;/);
+  f.config.delete('apc.iframe.style');
+  f.modern.updateImports(f.context);
+  assert.equal(fs.readFileSync(webview.file, 'utf8'), webview.original);
+  f.modern.uninstallPatch();
+  assert.equal(f.currentHtml(), html);
+  assert.equal(fs.readFileSync(webview.file, 'utf8'), webview.original);
+  assert.ok(!fs.existsSync(path.join(f.base, 'apc-extension')));
+});
+
+test('failed installation rolls back external application files along with sidecars', t => {
+  const f = fixture(t);
+  const webview = webviewFixture(f);
+  f.config.set('apc.iframe.style', { body: { color: 'red' } });
+  f.failWrite(file => path.basename(file).startsWith('config.json.apc-tmp-'));
+  assert.throws(() => f.modern.install(f.context), /injected write failure/);
+  assert.equal(fs.readFileSync(webview.file, 'utf8'), webview.original);
+  assert.equal(f.currentHtml(), html);
+  assert.ok(!fs.existsSync(path.join(f.base, 'apc-extension')));
+});
+
+test('failed refresh restores external files, publication and backup metadata together', t => {
+  const f = fixture(t);
+  const webview = webviewFixture(f);
+  f.config.set('apc.iframe.style', { body: { color: 'red' } });
+  f.modern.install(f.context);
+  const before = fs.readFileSync(webview.file, 'utf8');
+  const backup = fs.readFileSync(path.join(f.base, 'apc-extension/state.json'), 'utf8');
+  f.config.set('apc.iframe.style', { body: { color: 'blue' } });
+  f.failWrite(file => path.basename(file).startsWith('config.json.apc-tmp-'));
+  assert.throws(() => f.modern.updateImports(f.context), /injected write failure/);
+  assert.equal(fs.readFileSync(webview.file, 'utf8'), before);
+  assert.equal(fs.readFileSync(path.join(f.base, 'apc-extension/state.json'), 'utf8'), backup);
+  f.modern.uninstallPatch();
+  assert.equal(fs.readFileSync(webview.file, 'utf8'), webview.original);
+});
+
+test('external edits and corrupt external backups block both updates and restoration', t => {
+  const f = fixture(t);
+  const webview = webviewFixture(f);
+  f.config.set('apc.iframe.style', { body: { color: 'red' } });
+  f.modern.install(f.context);
+  const patched = fs.readFileSync(webview.file, 'utf8');
+  fs.writeFileSync(webview.file, patched + 'external edit');
+  assert.throws(() => f.modern.updateImports(f.context), /changed outside APC/);
+  assert.throws(() => f.modern.uninstallPatch(), /changed outside APC/);
+  assert.equal(fs.readFileSync(webview.file, 'utf8'), patched + 'external edit');
+  fs.writeFileSync(webview.file, patched);
+  const directory = path.join(f.base, 'apc-extension');
+  const state = JSON.parse(fs.readFileSync(path.join(directory, 'state.json'), 'utf8'));
+  const snapshot = Object.values(state.files)[0];
+  fs.writeFileSync(path.join(directory, snapshot.backup), 'corrupt backup');
+  assert.throws(() => f.modern.uninstallPatch(), /backup is invalid/);
+  assert.equal(fs.readFileSync(webview.file, 'utf8'), patched);
+});
+
+test('native changes share backup, refresh, setting-removal and uninstall transactions', t => {
+  const f = fixture(t);
+  const out = path.join(f.root, 'out');
+  const main = path.join(out, 'main.js');
+  const implementation = path.join(out, 'mainImpl.js');
+  const renderer = path.join(out, 'vs/workbench/workbench.desktop.main.js');
+  const loader = path.join(out, 'apc-native-loader.mjs');
+  const visibility = 'function visible(config){let value=config.getValue("window.menuBarVisibility");return value==="default"||value==="compact"&&native(config)||mac&&nativeTitle?"classic":value}';
+  fs.mkdirSync(path.dirname(renderer), { recursive: true });
+  fs.writeFileSync(main, 'await import("./mainImpl.js");');
+  fs.writeFileSync(implementation, 'function options(){const c={backgroundColor:theme.getBackgroundColor(),minWidth:400,webPreferences:{sandbox:!0,autoplayPolicy:"user-gesture-required"}};return tweak&&(c.webPreferences={backgroundThrottling:!1}),c}function next(){}' + visibility);
+  const measurements = 'class A{constructor(a,b,c,d=Opts){this.virtualDelegate=b;this.domId=`list_id_${1}`;}get tabHeight(){let a=this.groupsView.partOptions.tabHeight;return a==="compact"?22:35}getHoverTitle(){}};this.workbenchGrid=a,this.workbenchGrid.edgeSnapping=false;function layout(a,b){let c;if(this.options.hasTitle){let d=35;c=new D(a,Math.min(b,d))}else c=D.None;let e;if(this.headerVisible){}}';
+  fs.writeFileSync(renderer, measurements + visibility);
+  const originals = new Map([main, implementation, renderer].map(file => [file, fs.readFileSync(file, 'utf8')]));
+  f.config.set('apc.electron', { opacity: 0.8 });
+  f.config.set('apc.menubar.compact', true);
+  f.config.set('apc.listRow', { height: 40 });
+  f.modern.install(f.context);
+  assert.match(fs.readFileSync(loader, 'utf8'), /"opacity":0.8/);
+  assert.match(fs.readFileSync(renderer, 'utf8'), /return"compact"/);
+  assert.match(fs.readFileSync(renderer, 'utf8'), /__apcCustomizations\.list/);
+  f.config.set('apc.electron', { opacity: 0.6 });
+  f.modern.updateImports(f.context);
+  assert.match(fs.readFileSync(loader, 'utf8'), /"opacity":0.6/);
+  f.config.delete('apc.electron');
+  f.config.delete('apc.menubar.compact');
+  f.modern.updateImports(f.context);
+  assert.match(fs.readFileSync(renderer, 'utf8'), /__apcCustomizations\.list/, 'Removing compact menus must preserve the independent measurement patch');
+  assert.equal(fs.existsSync(loader), false, 'Removing native settings must remove the generated bootstrap');
+  f.config.delete('apc.listRow');
+  f.modern.updateImports(f.context);
+  for (const [file, content] of originals) { assert.equal(fs.readFileSync(file, 'utf8'), content); }
+  f.modern.uninstallPatch();
+  assert.equal(fs.existsSync(loader), false);
+  assert.equal(f.currentHtml(), html);
 });

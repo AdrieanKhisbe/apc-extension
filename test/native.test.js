@@ -30,7 +30,7 @@ test('native preparation is opt-in and never writes application files', t => {
   const changes = f.prepare();
   assert.ok(changes.get(f.files.main).includes('await import("./apc-native-loader.mjs")'));
   assert.ok(changes.get(f.files.loader).includes('"opacity":0.7'));
-  assert.ok(changes.get(f.files.implementation).includes('globalThis[Symbol.for("apc.native.options")](c)'));
+  assert.ok(changes.get(f.files.implementation).includes('globalThis[Symbol.for("apc.native.options")]?.(c)??c'));
   assert.equal(fs.readFileSync(f.files.main, 'utf8'), original);
   assert.equal(fs.existsSync(f.files.loader), false);
 });
@@ -54,6 +54,18 @@ test('unknown or ambiguous native anchors fail before writing', t => {
   fs.writeFileSync(f.files.main, 'await import("./mainImpl.js");await import("./mainImpl.js");');
   assert.throws(() => f.prepare(), /found 2/);
   assert.equal(fs.existsSync(f.files.loader), false);
+});
+
+test('a window starting before native loader publication retains safe editor defaults', t => {
+  const f = fixture(t);
+  f.config.set('electron', { opacity: 0.7 });
+  const source = f.prepare().get(f.files.implementation);
+  const options = vm.runInNewContext(source + ';options()', {
+    theme: { getBackgroundColor: () => '#000000' }, tweak: false,
+  });
+  assert.equal(options.backgroundColor, '#000000');
+  assert.equal(options.webPreferences.sandbox, true);
+  assert.equal(options.opacity, undefined);
 });
 
 test('native options cannot replace web preferences or serialize invalid settings', t => {

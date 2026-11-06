@@ -75,7 +75,9 @@ export function prepareNative(context: vscode.ExtensionContext, originals: Reado
       if (!body.includes(`${result}={backgroundColor:`) || !body.includes('.getBackgroundColor(),minWidth:') || !body.includes('webPreferences:') || !body.includes('sandbox:!0')) {
         throw new Error('Unsupported BrowserWindow default-options function');
       }
-      return `backgroundThrottling:!1}),globalThis[Symbol.for("apc.native.options")](${result})}function`;
+      // A window can start while files are being published. Until the startup
+      // loader is present, retain VS Code's defaults rather than crash startup.
+      return `backgroundThrottling:!1}),globalThis[Symbol.for("apc.native.options")]?.(${result})??${result}}function`;
     }, 'BrowserWindow default-options return');
     // These properties must remain owned by VS Code, including its sandbox.
     if (!implementation.includes('sandbox:!0') || !implementation.includes('autoplayPolicy:"user-gesture-required"')) { throw new Error('Unsupported BrowserWindow preferences'); }

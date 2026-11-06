@@ -9,7 +9,7 @@ exports.run = async function () {
   const cdp = await connect(process.env.APC_CDP_PORT);
   const config = vscode.workspace.getConfiguration();
   const platform = process.platform === 'darwin' ? 'osx' : 'linux';
-  const settings = ['apc.buttons', 'apc.theme', 'workbench.colorCustomizations',
+  const settings = ['apc.buttons', 'apc.theme', 'apc.statusBar', 'workbench.colorCustomizations',
     `terminal.integrated.profiles.${platform}`, `terminal.integrated.defaultProfile.${platform}`];
   const original = new Map(settings.map(key => [key, config.inspect(key)?.globalValue]));
   const update = (key, value) => config.update(key, value, vscode.ConfigurationTarget.Global);
@@ -37,6 +37,13 @@ exports.run = async function () {
     await eventually(async () => JSON.stringify(await labels()) === JSON.stringify(['APC check high', 'APC check low']), 'Button update must replace the old item and preserve priority order');
     await click('APC check high');
     await eventually(() => clicks === 2, 'Updated status bar button did not invoke its command');
+
+    const statusHeight = () => cdp.evaluate(`(() => { const node = document.querySelector('.part.statusbar'); return [node.getBoundingClientRect().height, node.parentElement.getBoundingClientRect().height]; })()`);
+    await eventually(async () => JSON.stringify(await statusHeight()) === '[30,30]', 'Initial status bar height must match its grid allocation');
+    await update('apc.statusBar', { height: 36 });
+    await eventually(async () => JSON.stringify(await statusHeight()) === '[36,36]', 'Live status height must resize the grid');
+    await update('apc.statusBar', { height: 30 });
+    await eventually(async () => JSON.stringify(await statusHeight()) === '[30,30]', 'Returning to a previous configuration must reapply it');
 
     // A real terminal command proves the generated registration is usable.
     await update(`terminal.integrated.profiles.${platform}`, { 'APC test shell': { path: '/bin/sh', args: [] } });

@@ -444,7 +444,7 @@
     "precompile": "node scripts/clean-build.cjs",
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
-    "pretest": "npm run compile && npm run lint && node --test test/lifecycle.test.js test/modern.test.js",
+    "pretest": "npm run compile && npm run lint && node --test test/lifecycle.test.js test/modern.test.js test/webview.test.js test/native.test.js test/customizations.test.js",
     "lint": "eslint src --ext ts",
     "test": "node ./test/runTest.js"
   },

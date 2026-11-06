@@ -5,18 +5,45 @@ import * as os from 'os';
 import { createHash, randomBytes } from 'crypto';
 import { fileURLToPath } from 'url';
 import { getConfiguration, getStyles } from './utils';
+import { prepareWebview, getWebviewStyleFiles } from './webview';
+import { prepareNative } from './native';
+import { prepareCustomizations, customizationStyles, customizationScript } from './customizations';
 
 const directoryName = 'apc-extension';
 const marker = '<!-- APC modern imports -->';
 const policyName = 'apcImports';
 const startup = /<script\b(?=[^>]*\bsrc=["'](?:\.\/)?workbench\.js["'])(?=[^>]*\btype=["']module["'])[^>]*>\s*<\/script>/g;
 
-type State = { format: number; version: string; workbenchHash: string; original: string; originalHash: string; patchedHash: string };
-type Entry = { kind: 'css' | 'js'; text?: string; src?: string; source?: string; attributes?: Record<string, string> };
+type FileState = { backup?: string; originalHash?: string; patchedHash?: string };
+type State = { format: number; version: string; workbenchHash: string; original: string; originalHash: string; patchedHash: string; files?: Record<string, FileState> };
+type Entry = { kind: 'css' | 'js'; text?: string; src?: string; source?: string; repeat?: boolean; attributes?: Record<string, string> };
 type Publication = { revision: string; entries: Entry[] };
 type Layout = { html: string; directory: string; state: string; workbench: string };
 
 function digest(content: string | Buffer) { return createHash('sha256').update(content).digest('hex'); }
+
+function applicationFile(relative: string): string {
+  const root = path.join(vscode.env.appRoot, 'out');
+  const file = path.resolve(root, relative);
+  if (!relative || path.isAbsolute(relative) || path.relative(root, file).startsWith('..')) {
+    throw new Error(`Invalid APC application backup path: ${relative}`);
+  }
+  return file;
+}
+
+function originalFiles(layout: Layout, state?: State): Map<string, string> {
+  const originals = new Map<string, string>();
+  for (const [relative, snapshot] of Object.entries(state?.files ?? {})) {
+    const file = applicationFile(relative);
+    if (snapshot.backup) {
+      if (snapshot.backup !== `backup-${digest(relative)}.txt`) { throw new Error('Invalid APC file backup name'); }
+      const original = fs.readFileSync(path.join(layout.directory, snapshot.backup), 'utf8');
+      if (digest(original) !== snapshot.originalHash) { throw new Error(`APC backup is invalid: ${relative}`); }
+      originals.set(file, original);
+    } else if (snapshot.originalHash !== undefined) { throw new Error('Invalid APC file backup metadata'); }
+  }
+  return originals;
+}
 
 function withLock<T>(layout: Layout, operation: () => T): T {
   const lock = layout.directory + '.lock';
@@ -51,7 +78,7 @@ function readState(layout: Layout): State | undefined {
   }
   if (!fs.existsSync(layout.state)) { throw new Error(`APC cannot overwrite an unrecognized directory: ${layout.directory}`); }
   for (const name of fs.readdirSync(layout.directory)) {
-    if (!/^(state\.json|config\.json|loader\.js|script-[a-f0-9]{64}\.js)$/.test(name) || !fs.lstatSync(path.join(layout.directory, name)).isFile()) {
+    if (!/^(state\.json|config\.json|loader\.js|script-[a-f0-9]{64}\.js|backup-[a-f0-9]{64}\.txt)$/.test(name) || !fs.lstatSync(path.join(layout.directory, name)).isFile()) {
       throw new Error(`APC patch directory contains an unrecognized file: ${name}`);
     }
   }
@@ -64,6 +91,13 @@ function readState(layout: Layout): State | undefined {
   }
   if (digest(fs.readFileSync(layout.html)) !== state.patchedHash) {
     throw new Error('VS Code workbench HTML changed outside APC. Refusing to overwrite it or restore an outdated backup.');
+  }
+  originalFiles(layout, state);
+  for (const [relative, snapshot] of Object.entries(state.files ?? {})) {
+    const file = applicationFile(relative);
+    if (fs.existsSync(file) && !fs.lstatSync(file).isFile()) { throw new Error(`APC application file is not regular: ${relative}`); }
+    const current = fs.existsSync(file) ? digest(fs.readFileSync(file)) : undefined;
+    if (current !== snapshot.patchedHash) { throw new Error(`Application file changed outside APC: ${relative}`); }
   }
   return state;
 }
@@ -79,7 +113,7 @@ function localPath(source: string): string {
 
 // Compile configured imports into a versioned renderer snapshot: copy local JS,
 // inline CSS, watch local sources, and collect explicitly allowed remote origins.
-function prepareImports() {
+function prepareImports(context: vscode.ExtensionContext) {
   const imports = getConfiguration<unknown>('apc.imports') ?? [];
   if (!Array.isArray(imports)) { throw new Error('apc.imports must be an array'); }
   const entries: Entry[] = [];
@@ -127,6 +161,12 @@ function prepareImports() {
   }
   const stylesheet = getConfiguration<Record<string, string>>('apc.stylesheet');
   if (stylesheet) { entries.push({ kind: 'css', text: getStyles(stylesheet) }); }
+  const styles = customizationStyles();
+  if (styles) { entries.push({ kind: 'css', text: styles }); }
+  const runtime = customizationScript(context);
+  const runtimeName = `script-${digest(runtime)}.js`;
+  files.set(runtimeName, runtime);
+  entries.push({ kind: 'js', src: runtimeName, source: 'APC customization configuration', repeat: true });
   const publication: Publication = { revision: digest(JSON.stringify(entries)), entries };
   files.set('config.json', JSON.stringify(publication));
   return { files, watched, origins };
@@ -171,7 +211,7 @@ function writeAtomic(file: string, data: string | Buffer) {
 // application HTML and sidecars; a backup is persisted before HTML is changed.
 // Keep this bounded file batch synchronous while holding the cross-process lock.
 // Awaiting writes here would also require serializing refresh/dispose callbacks.
-function transaction(layout: Layout, changes: Map<string, string>) {
+function transaction(layout: Layout, changes: Map<string, string | undefined>) {
   const existed = fs.existsSync(layout.directory);
   const before = new Map<string, Buffer | undefined>();
   for (const file of changes.keys()) {
@@ -180,7 +220,10 @@ function transaction(layout: Layout, changes: Map<string, string>) {
   }
   try {
     fs.mkdirSync(layout.directory, { recursive: true });
-    for (const [file, content] of changes) { writeAtomic(file, content); }
+    for (const [file, content] of changes) {
+      if (content !== undefined) { writeAtomic(file, content); }
+      else if (fs.existsSync(file)) { fs.unlinkSync(file); }
+    }
   } catch (error) {
     const failures: unknown[] = [];
     for (const [file, content] of [...before].reverse()) {
@@ -245,10 +288,50 @@ export function install(context: vscode.ExtensionContext, notify = true) {
 function applyInstallation(layout: Layout, context: vscode.ExtensionContext, notify: boolean) {
   const state = readState(layout);
   const original = state?.original ?? fs.readFileSync(layout.html, 'utf8');
-  const { files, watched, origins } = prepareImports();
+  const originals = originalFiles(layout, state);
+  const { files, watched, origins } = prepareImports(context);
+  for (const file of getWebviewStyleFiles()) { watched.add(file); }
+  const applicationChanges = new Map<string, string | undefined>();
+  // Start from originals so removing a setting also removes its application patch.
+  for (const relative of Object.keys(state?.files ?? {})) {
+    const file = applicationFile(relative);
+    applicationChanges.set(file, originals.get(file));
+  }
+  // Compose adapters over a working copy: native menus and UI measurements can
+  // both change the renderer bundle, while backups always retain clean bytes.
+  const working = new Map(originals);
+  for (const prepare of [prepareCustomizations, prepareNative, prepareWebview]) {
+    for (const [file, content] of prepare(context, working)) {
+      applicationChanges.set(file, content);
+      working.set(file, content);
+    }
+  }
   const html = patchHtml(original, origins);
-  const backup: State = { format: 1, version: vscode.version, workbenchHash: digest(fs.readFileSync(layout.workbench)), original, originalHash: digest(original), patchedHash: digest(html) };
-  const changes = new Map<string, string>();
+  const backup: State = { format: 1, version: vscode.version, workbenchHash: digest(fs.readFileSync(layout.workbench)), original, originalHash: digest(original), patchedHash: digest(html), files: {} };
+  const changes = new Map<string, string | undefined>();
+  let applicationChanged = false;
+  for (const [file, content] of applicationChanges) {
+    const relative = path.relative(path.join(vscode.env.appRoot, 'out'), file);
+    if (applicationFile(relative) !== file || file === layout.html || file.startsWith(layout.directory + path.sep)) {
+      throw new Error(`Invalid APC application change: ${file}`);
+    }
+    if (fs.existsSync(file) && !fs.lstatSync(file).isFile()) { throw new Error(`APC refuses to overwrite a non-regular file: ${file}`); }
+    const previous = state?.files?.[relative];
+    const initial = previous ? originals.get(file) : fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : undefined;
+    const snapshot: FileState = { patchedHash: content === undefined ? undefined : digest(content) };
+    if (initial !== undefined) {
+      snapshot.backup = `backup-${digest(relative)}.txt`;
+      snapshot.originalHash = digest(initial);
+      if (!previous) { changes.set(path.join(layout.directory, snapshot.backup), initial); }
+    }
+    backup.files![relative] = snapshot;
+    const current = fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : undefined;
+    if (current !== content) { applicationChanged = true; changes.set(file, content); }
+  }
+  // Publish native dependencies before the main-process entry point. The native
+  // adapter also falls back to editor defaults during concurrent window starts.
+  const main = path.join(vscode.env.appRoot, 'out/main.js');
+  if (changes.has(main)) { const content = changes.get(main); changes.delete(main); changes.set(main, content); }
   changes.set(layout.state, JSON.stringify(backup));
   files.set('loader.js', fs.readFileSync(path.join(context.extensionPath, 'resources/modern-loader.js'), 'utf8'));
   for (const [name, content] of files) { changes.set(path.join(layout.directory, name), content); }
@@ -257,8 +340,8 @@ function applyInstallation(layout: Layout, context: vscode.ExtensionContext, not
   watchImports(watched, context);
   try { transaction(layout, changes); }
   catch (error) { disposePatch(); throw error; }
-  if (notify && (!state || state.patchedHash !== backup.patchedHash)) {
-    void vscode.window.showInformationMessage('Reload the VS Code window to load APC imports or new external import origins.', 'Reload Window')
+  if (notify && (!state || state.patchedHash !== backup.patchedHash || applicationChanged)) {
+    void vscode.window.showInformationMessage('Reload VS Code windows and recreate webviews to apply changed application customizations.', 'Reload Window')
       .then(action => { if (action === 'Reload Window') { void vscode.commands.executeCommand('workbench.action.reloadWindow'); } });
   }
 }
@@ -277,13 +360,20 @@ function unapplyInstallation(layout: Layout): boolean {
   const state = readState(layout);
   if (!state) { disposePatch(); return true; }
   disposePatch();
-  // Move sidecars out of the served path, restore HTML, then remove the backup.
-  // A failed HTML write renames them back, leaving the installed patch intact.
+  // Restore every application file as one rollback-capable batch before retiring
+  // its backup. A failed write leaves the installed publication intact.
   const retired = layout.directory + '.removing';
   if (fs.existsSync(retired)) { throw new Error(`APC removal backup already exists: ${retired}`); }
-  fs.renameSync(layout.directory, retired);
-  try { writeAtomic(layout.html, state.original); }
-  catch (error) { fs.renameSync(retired, layout.directory); throw error; }
+  const originals = originalFiles(layout, state);
+  const changes = new Map<string, string | undefined>([[layout.html, state.original]]);
+  for (const relative of Object.keys(state.files ?? {})) {
+    const file = applicationFile(relative);
+    changes.set(file, originals.get(file));
+  }
+  const before = new Map([...changes].map(([file]) => [file, fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : undefined]));
+  transaction(layout, changes);
+  try { fs.renameSync(layout.directory, retired); }
+  catch (error) { transaction(layout, before); throw error; }
   fs.rmSync(retired, { recursive: true });
   return true;
 }
