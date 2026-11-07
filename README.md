@@ -29,18 +29,19 @@ latest stable release; the old AMD implementation has been removed.
 | Local `.css`/`.js` imports | ✅ Absolute paths, `file://`, `${userHome}`, import objects | ✅ Automated publication and real-editor imports |
 | HTTP(S) import objects | ✅ Configured script/style origins | ✅ Real-editor loading under CSP |
 | `apc.stylesheet` | ✅ Live configuration updates | ✅ Real-editor changes and removal |
-| Live local file updates | ✅ Including atomic saves | ✅ Real-editor CSS/JS updates and unchanged-script deduplication |
+| Live local file updates | ✅ Including atomic saves | ✅ Repeated atomic CSS saves, CSS/JS updates, deduplication and failure recovery |
 | `apc.buttons` | ✅ Status-bar commands, terminal buttons and live SCM counts | ✅ Startup, clicks, priority, terminal execution, Git counts, repository lifecycle, cleanup and re-enable |
 | `apc.theme` | ✅ Startup/live colors and persistent restoration on removal/disable | ✅ Lifecycle, reopening, manual-edit preservation, interrupted writes, renderer colors and disabled-state gating |
-| Font overrides | ✅ Global, monospace and per-part styles | 🟡 All part selectors checked in unit tests; computed global/part fonts and removal in editor; other font combinations unverified |
-| List row/header dimensions | ✅ Virtualized measurements, font sizes and tab/sidebar headers | 🟡 Default delegates and special rows checked in unit tests; Explorer geometry, pointer selection, scrolling, live updates and reset in editor |
-| Activity/status bar layout | ✅ Measured sizing, horizontal bottom activity bar and four status positions | 🟡 Grid bounds, mouse/keyboard navigation, live changes, bottom-panel handling and reset; other layout combinations need coverage |
-| `apc.electron`, compact menubar | ✅ Documented window options and compact menus | 🟡 macOS window getters, sandbox preservation, mouse/keyboard menus and restoration; other OS visual effects unverified |
-| Iframe/webview styling | ✅ Object/file CSS, file watching and restoration | 🟡 Three CSP policies, theme/recreation, live publication, isolation and restoration; other extension lifecycles need coverage |
+| Font overrides | ✅ Global, monospace and per-part styles | 🟡 All part selectors in unit tests; global/sidebar/tab/panel and auxiliary-window fonts in editor; remaining combinations unverified |
+| List row/header dimensions | ✅ Virtualized measurements, font sizes and tab/sidebar headers | 🟡 Default delegates and special rows in unit tests; Explorer/Search/Outline/SCM geometry, pointer selection, scrolling, live updates and reset in editor |
+| Activity/status bar layout | ✅ Measured sizing, horizontal bottom activity bar and four status positions | 🟡 Four status positions, visibility, right sidebar, left/right/bottom panels, grid bounds, navigation and reset; Zen/fullscreen combinations unverified |
+| `apc.electron`, compact menubar | ✅ Documented window options and compact menus | 🟡 macOS/Windows window getters, sandbox preservation, unfocused test windows, mouse/keyboard menus and restoration; compositor effects unverified |
+| Iframe/webview styling | ✅ Object/file CSS, file watching and restoration | 🟡 Three CSP policies, theme/recreation, retained/moved panels, custom editors, sidebar views, notebook output and restoration; Markdown previews/nested frames unverified |
 
 ✅ = implemented or automated checks passed for the stated scope; 🟡 = partial
-implementation or coverage. Native-window visual checks cover VS Code 1.140.0 and 1.143.1 on macOS
-ARM64. Unknown internal layouts are rejected before application files are changed.
+implementation or coverage. CI runs VS Code 1.140.0 and current stable on Linux,
+macOS and Windows, including native-window/menu probes on macOS and Windows.
+Unknown internal layouts are rejected before application files are changed.
 
 `apc.theme` overrides only the listed global color tokens. Removing tokens or
 disabling APC restores their previous values, including across editor restarts;

@@ -6,11 +6,15 @@ User setup and feature availability are in [README.md](README.md).
 
 Use Node.js 22 or newer: `npm ci`, then `npm test`. On Linux, use
 `xvfb-run -a npm test`. Set `VSCODE_VERSION=stable` to test the current stable
-release; the default is 1.140.0. CI runs both and uploads editor logs.
+release; the default is 1.140.0. CI runs both on Ubuntu, macOS and Windows and
+uploads editor logs and measured results. To run compilation, lint and Node
+regressions without launching an editor, use `npm run pretest`.
 
 The harness downloads a disposable editor and uses isolated profiles/extensions.
 It never patches the installed editor. All runners use a test-only Electron
-guard with `showInactive()` and suppressed window/application focus calls, then
+guard that constructs hidden windows, makes macOS/Windows windows nonfocusable,
+uses `showInactive()` and suppresses window/application focus calls. CDP emulates
+renderer focus for keyboard tests without activating native windows. Runners
 restore the guard in `finally`. Compilation, lint and the focused
 `node:test` regressions run first. Real extension-host runners export an awaited
 `run()` function through VS Code's custom runner interface: install, imports,
@@ -29,24 +33,36 @@ Theme ownership uses an atomic journal in extension storage, independently of
 Memento snapshots; disk-backed tests cover reopening, corruption and I/O errors.
 `test/customizations.test.js` covers all supported font selectors and default
 list delegates, including per-view overrides and special input/action rows;
-the editor suite verifies actual geometry for Explorer.
-`test/webview.integration.js` exercises the actual watcher/configuration path.
-`test/webview.run.js` additionally checks three CSP policies, theme changes and
-document recreation in a separate fixture extension.
+the editor suite verifies actual geometry for Explorer, Search, Outline and SCM,
+plus pointer navigation, scrolling and scoped fonts.
+`test/webview.integration.js` exercises the actual watcher/configuration path
+with four successive atomic CSS saves. Node regressions cover publication
+failure recovery, bounded transient-error retries, disable cancellation and
+unchanged startup without application writes. `test/webview.run.js` checks
+three CSP policies and actual dark/light changes, document recreation, retained
+panels, custom text editors, sidebar views and stored notebook output across
+baseline/install/update/restoration phases in a separate fixture extension.
 
-The main harness also runs the measured-layout suite after restoration. To run
+The main harness runs the measured-layout suite first and restores its changes
+before the remaining extension-host suites. To run
 that suite independently, use
 `APC_EDITOR='/path/to/disposable/editor' node test/customizations-run.js`.
 It checks fonts, row geometry, pointer/scroll behavior, header bounds, horizontal
-activity navigation, all status positions, panel handling, live changes and reset. Never supply
+activity navigation, all status positions, status visibility, right sidebar,
+left/right/bottom panels, auxiliary-window tab/font scopes, live changes and reset. Never supply
 the daily editor or an editor copy currently used by another test.
 
-The macOS native-window/menu runner is separate:
-`node test/native.run.js '/path/to/disposable/Visual Studio Code.app'`.
-It creates its own APFS clone and checks actual window getters, sandboxing,
-mouse/keyboard menu interaction and exact restoration. Its platform-specific
-appearance assertions do not establish Windows/Linux support. Recorded macOS
-observations are in [test/evidence/native-findings.md](test/evidence/native-findings.md).
+The macOS/Windows native-window/menu runner is separate. Use
+`node test/native-ci.js` to select the cached/downloaded version, or
+`node test/native.run.js '/path/to/disposable/editor'` (the `.app` on macOS,
+executable on Windows). It creates its own APFS clone or Windows archive copy,
+checks actual opacity/background getters, macOS traffic-light position,
+unfocused/nonfocusable windows, sandboxing, mouse/keyboard compact-menu
+interaction and exact restoration. Windows runtime discovery also supports
+commit-versioned application directories. The terminal-button test uses
+PowerShell on Windows and `/bin/sh` elsewhere. These checks do not prove native
+compositor effects such as vibrancy or Mica. Historical macOS observations are
+in [test/evidence/native-findings.md](test/evidence/native-findings.md).
 Measured layout observations are in
 [test/evidence/customizations-findings.md](test/evidence/customizations-findings.md).
 
@@ -102,8 +118,9 @@ and removes generated sidecars; reload/restart afterward to unload running code.
 
 ## Coverage still needed
 
-The current checks establish specific behavior on the recorded builds, not every
-combination of private workbench internals. Extend coverage for other list/SCM
-views, auxiliary windows, panel/sidebar combinations, Zen/fullscreen modes,
-every font selector, custom editors/Markdown previews/nested frames, and native
-appearance on each OS. Keep those gaps explicit in the README feature table.
+The matrix establishes the stated behavior on VS Code 1.140.0 and current stable,
+not every combination of private workbench internals. Remaining gaps include
+Zen/fullscreen modes, every font/list combination, provider serialization across
+editor restarts, Markdown previews/nested frames, and native compositor appearance
+(vibrancy, Mica, transparency and frame combinations). Keep these limits explicit
+in the README feature table.
