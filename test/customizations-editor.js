@@ -72,6 +72,19 @@ exports.run = async () => {
     await input({ type: 'keyDown', key: 'ArrowRight', code: 'ArrowRight', windowsVirtualKeyCode: 39 }, 'Input.dispatchKeyEvent');
     await input({ type: 'keyUp', key: 'ArrowRight', code: 'ArrowRight', windowsVirtualKeyCode: 39 }, 'Input.dispatchKeyEvent');
     assert.equal(await cdp.evaluate(`document.activeElement !== globalThis.__apcFirstActivityFocus && !!document.activeElement?.closest('.part.activitybar')`), true, 'Horizontal activity navigation must respond to ArrowRight');
+    const showcaseFile = vscode.Uri.joinPath(vscode.workspace.workspaceFolders[0].uri, 'appearance.jsonc');
+    fs.writeFileSync(showcaseFile.fsPath, '// APC Customize UI++ — appearance example\n' + JSON.stringify({
+      'apc.font.family': 'Georgia',
+      'apc.parts.font.family': { statusbar: 'monospace' },
+      'apc.listRow': { height: 32, fontSize: 15 },
+      'apc.activityBar': { size: 56, position: 'bottom' },
+      'apc.statusBar': { height: 32, position: 'top' },
+      'apc.imports': ['/absolute/path/to/blue-translucent.css'],
+    }, null, 2) + '\n');
+    await vscode.window.showTextDocument(await vscode.workspace.openTextDocument(showcaseFile));
+    await eventually(() => cdp.evaluate(`document.querySelector('.monaco-editor .view-lines')?.textContent.includes('apc.font.family')`), 'Showcase source did not render');
+    // Delayed integrity/extension notifications must not cover the gallery.
+    await cdp.evaluate(`(() => {const style=document.createElement('style');style.id='apc-showcase-notifications';style.textContent='.notifications-toasts,.notifications-center{visibility:hidden !important}';document.head.appendChild(style);return true;})()`);
     if ((await vscode.commands.getCommands(true)).includes('notifications.clearAll')) {
       await vscode.commands.executeCommand('notifications.clearAll');
     }
@@ -83,7 +96,7 @@ exports.run = async () => {
       await cdp.evaluate(`(() => {const style=document.createElement('style');style.id='apc-showcase-blue';style.textContent=${JSON.stringify(blueStyle)};document.head.appendChild(style);return new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));})()`);
       const blueScreenshot = await cdp.send('Page.captureScreenshot', { format: 'png' });
       fs.writeFileSync(process.env.APC_CUSTOMIZATIONS_RESULTS.replace(/\.json$/, '-blue.png'), Buffer.from(blueScreenshot.data, 'base64'));
-    } finally { await cdp.evaluate(`document.getElementById('apc-showcase-blue')?.remove();true`); }
+    } finally { await cdp.evaluate(`document.getElementById('apc-showcase-blue')?.remove();document.getElementById('apc-showcase-notifications')?.remove();true`); }
     await cdp.evaluate(`globalThis.__apcCustomizations.configure({activityBar:{size:56,position:'bottom'},statusBar:{height:32,position:'editor-top'}});true`);
     const editorTop = await snapshot();
     assert.ok(editorTop.status.bottom <= editorTop.editor.y && editorTop.editor.y - editorTop.status.bottom <= 8, 'Editor-top status bar must reserve space above the editor');
