@@ -216,7 +216,12 @@ function transaction(layout: Layout, changes: Map<string, string | undefined>) {
   const before = new Map<string, Buffer | undefined>();
   for (const file of changes.keys()) {
     if (fs.existsSync(file) && !fs.lstatSync(file).isFile()) { throw new Error(`APC refuses to overwrite a non-regular file: ${file}`); }
-    before.set(file, fs.existsSync(file) ? fs.readFileSync(file) : undefined);
+    const current = fs.existsSync(file) ? fs.readFileSync(file) : undefined;
+    const desired = changes.get(file);
+    // Reopening an unchanged installation must not rewrite loaded application
+    // files (which can be held open by Windows) or replace identical sidecars.
+    if (desired === undefined ? current === undefined : current?.equals(Buffer.from(desired))) { changes.delete(file); }
+    else { before.set(file, current); }
   }
   try {
     fs.mkdirSync(layout.directory, { recursive: true });
@@ -241,11 +246,7 @@ function transaction(layout: Layout, changes: Map<string, string | undefined>) {
 let watchers: fs.FSWatcher[] = [];
 let refreshTimer: NodeJS.Timeout | undefined;
 let watcherGeneration = 0;
-function traceWatcher(event: string, details: unknown) {
-  if (process.env.APC_WATCH_TRACE) { console.log('[DEBUG-apc-watch]', event, details); }
-}
 export function disposePatch() {
-  traceWatcher('dispose', { generation: watcherGeneration, watchers: watchers.length });
   watcherGeneration++;
   watchers.forEach(watcher => watcher.close());
   watchers = [];
@@ -253,35 +254,49 @@ export function disposePatch() {
 }
 
 function watchImports(files: Set<string>, context: vscode.ExtensionContext) {
-  disposePatch();
-  const generation = watcherGeneration;
-  traceWatcher('start', { generation, files: [...files] });
+  // Keep the active watchers until the new publication commits. A failed
+  // transaction must not prevent the next save from repairing the publication.
+  const pending: fs.FSWatcher[] = [];
+  let generation: number | undefined;
+  function schedule(attempt = 0) {
+    if (generation === undefined || generation !== watcherGeneration) { return; }
+    if (refreshTimer) { clearTimeout(refreshTimer); }
+    refreshTimer = setTimeout(() => {
+      refreshTimer = undefined;
+      if (generation !== watcherGeneration) { return; }
+      try { updateImports(context); }
+      catch (error) {
+        const code = (error as NodeJS.ErrnoException).code;
+        // Atomic saves and Windows sharing locks can briefly block publication.
+        // Retry only native transient errors, never validation/rollback failures.
+        if (attempt < 3 && code && ['EBUSY', 'EPERM', 'ENOENT'].includes(code)) { schedule(attempt + 1); }
+        else { void vscode.window.showErrorMessage(`APC imports update failed: ${error}`); }
+      }
+    }, 75 * 2 ** attempt);
+  }
   try {
     // Watch directories to survive atomic saves and replacement of source files.
     for (const directory of new Set([...files].map(file => path.dirname(file)))) {
       const watcher = fs.watch(directory, (_event, name) => {
-        traceWatcher('event', { generation, current: watcherGeneration, directory, name: name?.toString() });
-        if (generation !== watcherGeneration) { return; }
-        if (name && !files.has(path.join(directory, name.toString()))) { traceWatcher('filtered', name.toString()); return; }
-        if (refreshTimer) { clearTimeout(refreshTimer); }
-        refreshTimer = setTimeout(() => {
-          if (generation !== watcherGeneration) { return; }
-          traceWatcher('refresh', { generation, current: watcherGeneration });
-          try { updateImports(context); traceWatcher('published', { generation, current: watcherGeneration }); }
-          catch (error) { traceWatcher('failure', String(error)); void vscode.window.showErrorMessage(`APC imports update failed: ${error}`); }
-        }, 75);
+        if (generation === undefined || generation !== watcherGeneration) { return; }
+        if (name && !files.has(path.join(directory, name.toString()))) { return; }
+        schedule();
       });
       watcher.on('error', error => {
-        if (generation !== watcherGeneration) { return; }
+        if (generation === undefined || generation !== watcherGeneration) { return; }
         disposePatch();
         void vscode.window.showErrorMessage(`APC file watching stopped for ${directory}: ${error}. Enable APC again to retry.`);
       });
-      watchers.push(watcher);
+      pending.push(watcher);
     }
   } catch (error) {
-    disposePatch();
+    pending.forEach(watcher => watcher.close());
     throw error;
   }
+  return {
+    commit() { disposePatch(); generation = watcherGeneration; watchers = pending; },
+    dispose() { pending.forEach(watcher => watcher.close()); },
+  };
 }
 
 // Public entry point: detect the layout and hold the application lock. The
@@ -349,9 +364,9 @@ function applyInstallation(layout: Layout, context: vscode.ExtensionContext, not
   for (const [name, content] of files) { changes.set(path.join(layout.directory, name), content); }
   changes.set(layout.html, html);
   // Watcher creation can fail (permissions/resource limits); do it before writes.
-  watchImports(watched, context);
-  try { transaction(layout, changes); }
-  catch (error) { disposePatch(); throw error; }
+  const pending = watchImports(watched, context);
+  try { transaction(layout, changes); pending.commit(); }
+  catch (error) { pending.dispose(); throw error; }
   if (notify && (!state || state.patchedHash !== backup.patchedHash || applicationChanged)) {
     const message = nativeChanged ? 'Restart VS Code to apply native window and menu changes.' : 'Reload VS Code windows and recreate webviews to apply changed application customizations.';
     void vscode.window.showInformationMessage(message, ...(nativeChanged ? [] : ['Reload Window']))

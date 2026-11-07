@@ -4,6 +4,7 @@ const os = require('node:os');
 const path = require('node:path');
 const vm = require('node:vm');
 const { test } = require('node:test');
+const { eventually } = require('./cdp');
 const { pathToFileURL } = require('node:url');
 const { createHash } = require('node:crypto');
 
@@ -20,21 +21,23 @@ function fixture(t) {
   const vscode = {
     env: { appRoot: root }, version: '1.140.0',
     workspace: { getConfiguration: section => ({ get: key => config.get(section ? section + '.' + key : key) }) },
-    window: { showInformationMessage: message => { notifications.push(message); return Promise.resolve(); }, showErrorMessage() {} },
+    window: { showInformationMessage: message => { notifications.push(message); return Promise.resolve(); }, showErrorMessage: message => { errors.push(message); } },
   };
-  let fault;
+  let fault; let faultCode; let faultRemaining = 1;
   const watchCallbacks = [];
+  const activeWatches = new Map();
+  const errors = [];
   const controlledFs = new Proxy(fs, {
     get(target, key) {
       if (key === 'watch') {
         // Deliver controlled events here; real filesystem watching is covered
         // by the workbench integration test's atomic CSS save.
-        return (...args) => { watchCallbacks.push(args[args.length - 1]); return { close() {}, on() {} }; };
+        return (...args) => { const callback = args[args.length - 1]; watchCallbacks.push(callback); activeWatches.set(callback, args[0]); return { close() { activeWatches.delete(callback); }, on() {} }; };
       }
-      if (key === 'writeFileSync') {
+      if (key === 'writeFileSync' || key === 'openSync') {
         return (filename, ...args) => {
-          if (fault?.(filename)) { fault = undefined; throw new Error('injected write failure'); }
-          return target.writeFileSync(filename, ...args);
+          if (fault?.(filename)) { if (--faultRemaining <= 0) { fault = undefined; } const error = new Error('injected write failure'); if (faultCode) { error.code = faultCode; } throw error; }
+          return target[key](filename, ...args);
         };
       }
       return target[key];
@@ -52,9 +55,10 @@ function fixture(t) {
   const modern = load(path.resolve(__dirname, '../dist/patch.js'));
   t.after(() => { modern.disposePatch(); fs.rmSync(root, { recursive: true, force: true }); });
   return {
-    root, base, config, modern, notifications,
+    root, base, config, modern, notifications, errors,
     context: { extensionPath: path.resolve(__dirname, '..') },
-    failWrite: predicate => { fault = predicate; },
+    failWrite: (predicate, code, times = 1) => { fault = predicate; faultCode = code; faultRemaining = times; },
+    fileChanged: file => { for (const [callback, directory] of [...activeWatches]) { if (directory === path.dirname(file)) { callback('change', path.basename(file)); } } },
     watchCallbacks,
     currentHtml: () => fs.readFileSync(path.join(base, 'workbench.html'), 'utf8'),
     publication: () => JSON.parse(fs.readFileSync(path.join(base, 'apc-extension/config.json'), 'utf8')),
@@ -262,7 +266,7 @@ test('failed refresh restores external files, publication and backup metadata to
   const before = fs.readFileSync(webview.file, 'utf8');
   const backup = fs.readFileSync(path.join(f.base, 'apc-extension/state.json'), 'utf8');
   f.config.set('apc.iframe.style', { body: { color: 'blue' } });
-  f.failWrite(file => path.basename(file).startsWith('config.json.apc-tmp-'));
+  f.failWrite(file => path.basename(file).startsWith('state.json.apc-tmp-'));
   assert.throws(() => f.modern.updateImports(f.context), /injected write failure/);
   assert.equal(fs.readFileSync(webview.file, 'utf8'), before);
   assert.equal(fs.readFileSync(path.join(f.base, 'apc-extension/state.json'), 'utf8'), backup);
@@ -324,4 +328,59 @@ test('native changes share backup, refresh, setting-removal and uninstall transa
   f.modern.uninstallPatch();
   assert.equal(fs.existsSync(loader), false);
   assert.equal(f.currentHtml(), html);
+});
+
+test('a failed publication keeps file watching active for the next save', async t => {
+  const f = fixture(t); const css = path.join(f.root, 'style.css');
+  fs.writeFileSync(css, 'body { color: red; }'); f.config.set('apc.imports', [css]); f.modern.install(f.context);
+  fs.writeFileSync(css, 'body { color: blue; }');
+  f.failWrite(file => path.basename(file).startsWith('config.json.apc-tmp-'));
+  assert.throws(() => f.modern.updateImports(f.context), /injected write failure/);
+  assert.equal(f.publication().entries[0].text, 'body { color: red; }');
+  fs.writeFileSync(css, 'body { color: green; }'); f.fileChanged(css);
+  await eventually(() => f.publication().entries[0].text === 'body { color: green; }', 'The next save must still publish after a failed refresh', 2000);
+});
+
+test('a transient sharing failure retries publication without a second save', async t => {
+  const f = fixture(t); const css = path.join(f.root, 'style.css');
+  fs.writeFileSync(css, 'body { color: red; }'); f.config.set('apc.imports', [css]); f.modern.install(f.context);
+  fs.writeFileSync(css, 'body { color: blue; }');
+  f.failWrite(file => path.basename(file).startsWith('config.json.apc-tmp-'), 'EBUSY');
+  f.fileChanged(css);
+  await eventually(() => f.publication().entries[0].text === 'body { color: blue; }', 'A transient file lock must not lose an accepted save', 2500);
+  assert.deepEqual(f.errors, []);
+});
+
+test('disable cancels a pending sharing-error retry', async t => {
+  const f = fixture(t); const css = path.join(f.root, 'style.css'); let failures = 0;
+  fs.writeFileSync(css, 'body { color: red; }'); f.config.set('apc.imports', [css]); f.modern.install(f.context);
+  f.failWrite(file => { if (path.basename(file).startsWith('config.json.apc-tmp-')) { failures++; return true; } return false; }, 'EBUSY');
+  fs.writeFileSync(css, 'body { color: blue; }'); f.fileChanged(css);
+  await eventually(() => failures === 1, 'First sharing failure was not injected');
+  f.modern.uninstallPatch();
+  await new Promise(resolve => setTimeout(resolve, 400));
+  assert.equal(f.currentHtml(), html);
+  assert.ok(!fs.existsSync(path.join(f.base, 'apc-extension')));
+});
+
+test('persistent sharing failures stop retrying and report one error', async t => {
+  const f = fixture(t); const css = path.join(f.root, 'style.css'); let failures = 0;
+  fs.writeFileSync(css, 'body { color: red; }'); f.config.set('apc.imports', [css]); f.modern.install(f.context);
+  f.failWrite(file => { if (path.basename(file) === 'apc-extension.lock') { failures++; return true; } return false; }, 'EBUSY', 100);
+  fs.writeFileSync(css, 'body { color: blue; }'); f.fileChanged(css);
+  await eventually(() => f.errors.length === 1, 'Persistent lock failure must eventually be reported', 3500);
+  assert.ok(failures > 1 && failures <= 5, 'Retries must be attempted but bounded');
+  assert.equal(f.publication().entries[0].text, 'body { color: red; }');
+});
+
+
+test('unchanged startup does not rewrite application files and resumes watching', async t => {
+  const f = fixture(t); const css = path.join(f.root, 'style.css');
+  fs.writeFileSync(css, 'body { color: red; }'); f.config.set('apc.imports', [css]); f.modern.install(f.context);
+  f.modern.disposePatch();
+  f.failWrite(file => String(file).includes('.apc-tmp-'));
+  assert.doesNotThrow(() => f.modern.ensurePatch(f.context));
+  f.failWrite(() => false);
+  fs.writeFileSync(css, 'body { color: blue; }'); f.fileChanged(css);
+  await eventually(() => f.publication().entries[0].text === 'body { color: blue; }', 'Reopened editor must resume file watching');
 });

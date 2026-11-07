@@ -5,6 +5,7 @@ import { createThemeManager, ThemeManager } from './theme';
 import { ensurePatch, uninstallPatch, install, disposePatch, updateImports } from './patch';
 
 function reportError(error: unknown) {
+  console.error('APC operation failed:', error);
   const message = error instanceof Error ? error.message : String(error);
   void vscode.window.showErrorMessage(`Apc Extension failed: ${message}`);
 }
