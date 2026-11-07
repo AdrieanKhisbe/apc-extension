@@ -241,7 +241,11 @@ function transaction(layout: Layout, changes: Map<string, string | undefined>) {
 let watchers: fs.FSWatcher[] = [];
 let refreshTimer: NodeJS.Timeout | undefined;
 let watcherGeneration = 0;
+function traceWatcher(event: string, details: unknown) {
+  if (process.env.APC_WATCH_TRACE) { console.log('[DEBUG-apc-watch]', event, details); }
+}
 export function disposePatch() {
+  traceWatcher('dispose', { generation: watcherGeneration, watchers: watchers.length });
   watcherGeneration++;
   watchers.forEach(watcher => watcher.close());
   watchers = [];
@@ -251,17 +255,20 @@ export function disposePatch() {
 function watchImports(files: Set<string>, context: vscode.ExtensionContext) {
   disposePatch();
   const generation = watcherGeneration;
+  traceWatcher('start', { generation, files: [...files] });
   try {
     // Watch directories to survive atomic saves and replacement of source files.
     for (const directory of new Set([...files].map(file => path.dirname(file)))) {
       const watcher = fs.watch(directory, (_event, name) => {
+        traceWatcher('event', { generation, current: watcherGeneration, directory, name: name?.toString() });
         if (generation !== watcherGeneration) { return; }
-        if (name && !files.has(path.join(directory, name.toString()))) { return; }
+        if (name && !files.has(path.join(directory, name.toString()))) { traceWatcher('filtered', name.toString()); return; }
         if (refreshTimer) { clearTimeout(refreshTimer); }
         refreshTimer = setTimeout(() => {
           if (generation !== watcherGeneration) { return; }
-          try { updateImports(context); }
-          catch (error) { void vscode.window.showErrorMessage(`APC imports update failed: ${error}`); }
+          traceWatcher('refresh', { generation, current: watcherGeneration });
+          try { updateImports(context); traceWatcher('published', { generation, current: watcherGeneration }); }
+          catch (error) { traceWatcher('failure', String(error)); void vscode.window.showErrorMessage(`APC imports update failed: ${error}`); }
         }, 75);
       });
       watcher.on('error', error => {

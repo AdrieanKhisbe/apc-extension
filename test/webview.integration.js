@@ -32,10 +32,13 @@ api.postMessage({ marker: getComputedStyle(document.body).getPropertyValue('--ap
   const backup = fs.readFileSync(process.env.APC_WEBVIEW_BACKUP);
   try {
     assert.equal(await inspect(), 'baseline', 'Configured webview CSS must load after startup');
-    fs.writeFileSync(style + '.tmp', 'body { --apc-webview-test: updated; }');
-    fs.renameSync(style + '.tmp', style);
-    await eventually(() => fs.readFileSync(template, 'utf8').includes('--apc-webview-test: updated'), 'Atomic webview CSS save did not publish');
-    assert.equal(await inspect(), 'updated', 'New webviews must receive the changed CSS file');
+    for (let revision = 1; revision <= 4; revision++) {
+      const marker = `updated-${revision}`;
+      fs.writeFileSync(style + '.tmp', `body { --apc-webview-test: ${marker}; }`);
+      fs.renameSync(style + '.tmp', style);
+      await eventually(() => fs.readFileSync(template, 'utf8').includes(`--apc-webview-test: ${marker}`), `Atomic webview CSS save ${revision} did not publish`);
+      assert.equal(await inspect(), marker, 'New webviews must receive each successive atomic CSS save');
+    }
     await config.update('apc.iframe.style', { body: { '--apc-webview-test': 'object' } }, vscode.ConfigurationTarget.Global);
     await eventually(() => fs.readFileSync(template, 'utf8').includes('--apc-webview-test: object'), 'Webview stylesheet object was not published');
     assert.equal(await inspect(), 'object');

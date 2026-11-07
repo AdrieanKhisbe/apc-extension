@@ -1,12 +1,13 @@
 const vscode = require('vscode');
 const fs = require('node:fs');
+const path = require('node:path');
 const assert = require('node:assert/strict');
-const { prepareWebview, getWebviewStyleFiles } = require('../dist/webview');
+const { prepareWebview, getWebviewStyleFiles } = require(path.join(process.env.APC_SOURCE_ROOT || path.resolve(__dirname, '..'), 'dist/webview'));
 const { eventually } = require('./cdp');
 
 exports.run = async () => {
   const phase = process.env.APC_WEBVIEW_PHASE;
-  const file = require('node:path').join(vscode.env.appRoot, 'out/vs/workbench/contrib/webview/browser/pre/index.html');
+  const file = path.join(vscode.env.appRoot, 'out/vs/workbench/contrib/webview/browser/pre/index.html');
   const original = fs.readFileSync(process.env.APC_WEBVIEW_ORIGINAL, 'utf8');
   const originals = new Map([[file, original]]);
   const settings = vscode.workspace.getConfiguration();

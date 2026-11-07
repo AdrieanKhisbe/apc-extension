@@ -22,6 +22,7 @@ jobs:
     env:
       VSCODE_VERSION: ${{ matrix.vscode }}
       APC_THEME_TRACE: '1'
+      APC_WATCH_TRACE: '1'
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

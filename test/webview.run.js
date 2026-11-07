@@ -24,12 +24,15 @@ async function main() {
   const driver = path.join(profile, 'driver'); fs.mkdirSync(driver);
   fs.writeFileSync(path.join(driver, 'package.json'), JSON.stringify({ name: 'apc-webview-test', publisher: 'apc-tests', version: '0.0.0', engines: { vscode: '^1.92.0' },
     contributes: { notebooks: [{ type: 'apc-tests.notebook', displayName: 'APC lifecycle notebook', selector: [{ filenamePattern: '*.apcnb' }] }], notebookRenderer: [{ id: 'apc-tests.notebook-renderer', displayName: 'APC lifecycle renderer', entrypoint: './notebook-renderer.mjs', mimeTypes: ['application/x.apc-fixture'], requiresMessaging: 'always' }], customEditors: [{ viewType: 'apc-tests.custom', displayName: 'APC lifecycle editor', selector: [{ filenamePattern: '*.apcfixture' }], priority: 'option' }], views: { explorer: [{ id: 'apc-tests.view', name: 'APC lifecycle view', type: 'webview' }] }, configuration: { properties: { 'apc.iframe.style': { type: ['object', 'string'] } } } } }));
-  fs.copyFileSync(path.join(__dirname, 'notebook-renderer.mjs'), path.join(driver, 'notebook-renderer.mjs'));
+  // VS Code scopes renderer messaging to the extension owning the caller file.
+  for (const file of ['notebook-renderer.mjs', 'webview.editor.js', 'webview-lifecycles.js', 'cdp.js']) {
+    fs.copyFileSync(path.join(__dirname, file), path.join(driver, file));
+  }
   try {
     for (const phase of ['baseline', 'installed', 'file-updated', 'restored']) {
       await runTests({ vscodeExecutablePath: executable, extensionDevelopmentPath: driver,
-        extensionTestsPath: path.join(__dirname, 'webview.editor.js'),
-        extensionTestsEnv: { APC_WEBVIEW_PHASE: phase, APC_WEBVIEW_OUTPUT: path.join(output, phase + '.json'), APC_WEBVIEW_ORIGINAL: backup, APC_WEBVIEW_STYLE: path.join(profile, 'style.css') },
+        extensionTestsPath: path.join(driver, 'webview.editor.js'),
+        extensionTestsEnv: { APC_SOURCE_ROOT: root, APC_WEBVIEW_PHASE: phase, APC_WEBVIEW_OUTPUT: path.join(output, phase + '.json'), APC_WEBVIEW_ORIGINAL: backup, APC_WEBVIEW_STYLE: path.join(profile, 'style.css') },
         launchArgs: [`--user-data-dir=${profile}/user-data`, `--extensions-dir=${profile}/extensions`, '--disable-extensions', '--disable-gpu', '--skip-welcome', '--skip-release-notes', '--disable-updates'] });
     }
     assert.deepEqual(fs.readFileSync(template), original, 'Removing webview configuration must restore exact template bytes');
