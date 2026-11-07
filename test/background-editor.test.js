@@ -8,9 +8,10 @@ const { withBackgroundEditor, source } = require('./background-editor');
 
 for (const platform of ['linux', 'darwin', 'win32']) {
   test(`test focus calls are suppressed on ${platform}`, () => {
-    let inactive = 0; let focused = 0; let created; let policy;
+    let inactive = 0; let focused = 0; let created; let policy; let loaded;
     class BrowserWindow {
-      constructor(options) { this.options = options; }
+      constructor(options) { this.options = options; this.webContents = { once: (event, fn) => { assert.equal(event, 'did-finish-load'); loaded = fn; } }; }
+      isDestroyed() { return false; }
       showInactive() { inactive++; }
       show() { focused++; }
       focus() { focused++; }
@@ -24,7 +25,8 @@ for (const platform of ['linux', 'darwin', 'win32']) {
     assert.equal(window.options.webPreferences, preferences, 'The guard must preserve native security preferences');
     created(null, window);
     window.show(); window.focus(); app.focus(); window.setFocusable(true);
-    assert.equal(inactive, 1);
+    loaded();
+    assert.equal(inactive, 2, 'Loading must show the window without activation');
     assert.equal(focused, 0);
     assert.equal(window.options.focusable, platform === 'linux');
     assert.equal(policy, platform === 'darwin' ? 'accessory' : undefined);

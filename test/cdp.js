@@ -43,6 +43,8 @@ async function connect(port, select = item => item.type === 'page' && item.url.i
     assert.ok(!response.error, JSON.stringify(response));
     return response.result;
   }
+  // Exercise renderer keyboard focus without activating the native OS window.
+  await send('Emulation.setFocusEmulationEnabled', { enabled: true });
   return {
     send,
     async evaluate(expression) {

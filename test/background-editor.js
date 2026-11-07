@@ -18,6 +18,7 @@ app.on('browser-window-created', (_event, window) => {
   }
   window.show = window.showInactive.bind(window);
   window.focus = () => {};
+  window.webContents.once('did-finish-load', () => { if (!window.isDestroyed()) { window.showInactive(); } });
 });
 `;
 
