@@ -4,11 +4,11 @@ const fs = require('node:fs');
 const { execFileSync } = require('node:child_process');
 const vscode = require('vscode');
 const { customizationStyles, customizationScript } = require('../dist/customizations');
-const { eventually } = require('./cdp');
+const { connect, eventually } = require('./cdp');
 
 exports.run = async function (cdp, input) {
   const config = vscode.workspace.getConfiguration('apc');
-  const keys = ['listRow', 'parts.font.family', 'header', 'sidebar.titlebar', 'activityBar', 'statusBar'];
+  const keys = ['font.family', 'monospace.font.family', 'listRow', 'parts.font.family', 'header', 'sidebar.titlebar', 'activityBar', 'statusBar'];
   const original = new Map(keys.map(key => [key, config.inspect(key)?.globalValue]));
   const reports = {};
   async function configure(values) {
@@ -74,7 +74,14 @@ let style=document.getElementById('apc-extended-styles');if(!style){style=docume
         const placed = await eventually(async () => {
           const g = await geometry();
           const beside = side === 'Right' ? g.panel.x >= g.editor.right - 1 : g.panel.right <= g.editor.x + 1;
-          return g.panel.width > 50 && g.panel.height > 50 && beside && g.sidebar.x >= g.editor.right - 1 && Math.abs(g.status.width - g.editor.width) <= 1 && g.status.y >= g.editor.bottom - 1 && g.status.bottom <= g.activity.y + 1 && g;
+          const diagnostic = JSON.stringify(g);
+          assert.ok(g.panel.width > 50 && g.panel.height > 50, 'Panel must be visible: ' + diagnostic);
+          assert.ok(beside, 'Panel must sit beside the editor: ' + diagnostic);
+          assert.ok(g.sidebar.x >= g.editor.right - 1, 'Sidebar must remain on the right: ' + diagnostic);
+          assert.ok(Math.abs(g.status.width - g.editor.width) <= 1, 'Status width must match the editor: ' + diagnostic);
+          assert.ok(g.status.y >= g.editor.bottom - 1, 'Status must remain below the editor: ' + diagnostic);
+          assert.ok(g.status.bottom <= g.activity.y + 1, 'Bottom activity bar must not overlap status: ' + diagnostic);
+          return g;
         }, `Editor-relative status bar must stay below the editor with a ${side.toLowerCase()} panel and right sidebar`);
         reports.sidePanels[side.toLowerCase()] = placed;
       }
@@ -91,6 +98,22 @@ let style=document.getElementById('apc-extended-styles');if(!style){style=docume
       await vscode.commands.executeCommand('workbench.action.closePanel');
       await vscode.commands.executeCommand('workbench.action.positionPanelBottom');
       await vscode.commands.executeCommand('workbench.action.moveSideBarLeft');
+    }
+    await configure({ header: { height: 42 }, 'font.family': 'Georgia', 'monospace.font.family': 'monospace', 'parts.font.family': { tabs: 'monospace' } });
+    await vscode.window.showTextDocument(vscode.Uri.joinPath(workspace, 'outline-fixture.js'));
+    const endpoint = `http://127.0.0.1:${process.env.APC_CDP_PORT}/json/list`;
+    const existing = new Set((await (await fetch(endpoint)).json()).map(target => target.id));
+    await vscode.commands.executeCommand('workbench.action.moveEditorToNewWindow');
+    const auxiliary = await connect(process.env.APC_CDP_PORT, target => target.type === 'page' && !existing.has(target.id));
+    try {
+      reports.auxiliary = await eventually(() => auxiliary.evaluate(`(() => {const tabs=document.querySelector('.editor-group-container .tabs-container');const editor=document.querySelector('.monaco-editor');if(!tabs||!editor)return null;return {height:tabs.getBoundingClientRect().height,font:getComputedStyle(tabs).fontFamily,monospace:getComputedStyle(editor).getPropertyValue('--monaco-monospace-font').trim()};})()`), 'Auxiliary editor did not render');
+      assert.equal(reports.auxiliary.height, 42, 'Auxiliary tabs must retain the measured header height');
+      assert.equal(reports.auxiliary.font, 'monospace', 'Auxiliary tabs must receive per-part font styles');
+      assert.equal(reports.auxiliary.monospace, 'monospace', 'Auxiliary editor must receive the monospace override');
+      console.log('PASS: an actual auxiliary window retains tab measurements and font styles.');
+    } finally {
+      await auxiliary.evaluate('setTimeout(()=>window.close(),0);true').catch(() => {});
+      auxiliary.close();
     }
     return reports;
   } finally {

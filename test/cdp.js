@@ -13,10 +13,10 @@ async function eventually(check, message, timeout = 15000) {
   throw new Error(`${message}${lastError ? `: ${lastError.message}` : ''}`);
 }
 
-async function connect(port) {
+async function connect(port, select = item => item.type === 'page' && item.url.includes('workbench.html')) {
   const target = await eventually(async () => {
     const targets = await (await fetch(`http://127.0.0.1:${port}/json/list`)).json();
-    return targets.find(item => item.type === 'page' && item.url.includes('workbench.html'));
+    return targets.find(select);
   }, 'Workbench debugging target did not start');
   const socket = new WebSocket(target.webSocketDebuggerUrl);
   await new Promise((resolve, reject) => {

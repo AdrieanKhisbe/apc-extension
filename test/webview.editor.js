@@ -14,6 +14,7 @@ exports.run = async () => {
   const expected = { baseline: '', installed: 'installed', 'file-updated': 'file-updated', restored: '' }[phase];
   const script = `<script nonce="fixture-script">const api = acquireVsCodeApi(); addEventListener('message', event => { if (event.data === 'remove-default-style') document.getElementById('_defaultStyles')?.remove(); }); setInterval(() => api.postMessage({ generation: document.body.dataset.fixtureGeneration, marker: getComputedStyle(document.body).getPropertyValue('--apc-webview-test').trim(), owned: getComputedStyle(document.body).getPropertyValue('--owned-style').trim(), csp: document.querySelector('meta[http-equiv="Content-Security-Policy"]').content, blockedScriptRan: !!globalThis.__blockedScriptRan, topDocumentAccessible: (() => { try { return !!top.document.body; } catch { return false; } })(), theme: document.body.dataset.vscodeThemeKind }), 150);</script>`;
   for (const policy of ["'unsafe-inline'", "'nonce-owned-style'", "'none'"]) {
+    await settings.update('workbench.colorTheme', 'Default Dark Modern', vscode.ConfigurationTarget.Global);
     const csp = `default-src 'none'; script-src 'nonce-fixture-script'; style-src ${policy};`;
     const html = `<html><head><meta http-equiv="Content-Security-Policy" content="${csp}"><style nonce="owned-style">body { --owned-style: works; }</style></head><body data-fixture-generation="initial">Webview fixture<script>globalThis.__blockedScriptRan = true;</script>${script}</body></html>`;
     const panel = vscode.window.createWebviewPanel('apc-webview-fixture', 'APC webview test', vscode.ViewColumn.One, { enableScripts: true });
@@ -22,7 +23,7 @@ exports.run = async () => {
     const wait = predicate => eventually(() => messages.find(predicate), `No webview report for ${phase} ${policy}: ${JSON.stringify(messages)}`);
     try {
       panel.webview.html = html;
-      const initial = await wait(message => message.csp === csp);
+      const initial = await wait(message => message.csp === csp && message.theme === 'vscode-dark');
       assert.equal(initial.marker, expected);
       assert.equal(initial.blockedScriptRan, false, 'Unconfigured inline scripts remain blocked');
       assert.equal(initial.topDocumentAccessible, false, 'Webview cannot access workbench DOM');
