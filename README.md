@@ -16,6 +16,56 @@ Unlike its predecessor, it ships with no default settings, granting you full cus
 
 Explore my setup for inspiration: [View Settings](https://github.com/drcika/apc-extension/blob/production/demo/settings.json)
 
+## Modern VS Code compatibility
+
+This port restores imports, UI customizations, native window options, and
+webview styling on module-based VS Code. Tested coverage is listed separately.
+Requires VS Code 1.140.0 or newer. Compatibility is tested on 1.140.0 and the
+latest stable release; the old AMD implementation has been removed.
+
+| Feature | Implemented | Tested |
+| --- | --- | --- |
+| Activation, enable/disable, restoration | ✅ Modern editor lifecycle and reversible patching | ✅ Automated lifecycle and real-editor checks |
+| Local `.css`/`.js` imports | ✅ Absolute paths, `file://`, `${userHome}`, import objects | ✅ Automated publication and real-editor imports |
+| HTTP(S) import objects | ✅ Configured script/style origins | ✅ Real-editor loading under CSP |
+| `apc.stylesheet` | ✅ Live configuration updates | ✅ Real-editor changes and removal |
+| Live local file updates | ✅ Including atomic saves | ✅ Real-editor CSS/JS updates and unchanged-script deduplication |
+| `apc.buttons` | ✅ Status-bar commands, terminal buttons and live SCM counts | ✅ Startup, clicks, priority, terminal execution, Git counts, repository lifecycle, cleanup and re-enable |
+| `apc.theme` | ✅ Startup/live colors and persistent restoration on removal/disable | ✅ Lifecycle, reopening, manual-edit preservation, interrupted writes, renderer colors and disabled-state gating |
+| Font overrides | ✅ Global, monospace and per-part styles | 🟡 All part selectors checked in unit tests; computed global/part fonts and removal in editor; other font combinations unverified |
+| List row/header dimensions | ✅ Virtualized measurements, font sizes and tab/sidebar headers | 🟡 Default delegates and special rows checked in unit tests; Explorer geometry, pointer selection, scrolling, live updates and reset in editor |
+| Activity/status bar layout | ✅ Measured sizing, horizontal bottom activity bar and four status positions | 🟡 Grid bounds, mouse/keyboard navigation, live changes, bottom-panel handling and reset; other layout combinations need coverage |
+| `apc.electron`, compact menubar | ✅ Documented window options and compact menus | 🟡 macOS window getters, sandbox preservation, mouse/keyboard menus and restoration; other OS visual effects unverified |
+| Iframe/webview styling | ✅ Object/file CSS, file watching and restoration | 🟡 Three CSP policies, theme/recreation, live publication, isolation and restoration; other extension lifecycles need coverage |
+
+✅ = implemented or automated checks passed for the stated scope; 🟡 = partial
+implementation or coverage. Native-window visual checks cover VS Code 1.140.0 and 1.143.1 on macOS
+ARM64. Unknown internal layouts are rejected before application files are changed.
+
+`apc.theme` overrides only the listed global color tokens. Removing tokens or
+disabling APC restores their previous values, including across editor restarts;
+later manual edits are preserved. An absent or empty theme applies no palette.
+Colors written by earlier APC versions have no saved baseline and cannot be
+automatically recovered.
+
+- **Reload after enabling/disabling APC**, first enabling layout hooks, adding
+  remote import origins, or removing JavaScript effects. Later UI/CSS edits update
+  live. **Restart VS Code** for native window/menu changes; **recreate webviews**
+  after webview style changes. Extensions can override these shared webview styles.
+- **Scripts run once per unchanged file per window.** Edited scripts must clean
+  up their own listeners/observers; reload after editing top-level `const`/`let`.
+- **Use one APC profile per installation.** Patches and import configuration are
+  shared by every window using that editor. Remote resources remain subject to
+  VS Code's CSP and are not watched.
+- **Disable restores the backed-up application files.** If APC reports a changed
+  build, damaged backup, or stale lock, follow the recovery guidance in
+  [CONTRIBUTING.md](CONTRIBUTING.md#patch-recovery).
+- Import errors appear in Developer Tools; file and patch errors also show a
+  notification.
+
+For test setup, porting notes, and contributor guidance, see
+[CONTRIBUTING.md](CONTRIBUTING.md).
+
 ## Getting Started
 
   - Open Visual Studio Code
@@ -80,7 +130,10 @@ This experimental extension tweaks certain VSCode / VSCodium files. <br>
 
 ---
 
-## Supported Configuration Options
+## Configuration reference
+
+Check the [compatibility table](#modern-vs-code-compatibility) for tested scope
+and the reload/restart requirements before using these settings.
 
 ### `apc.electron`
 
@@ -166,6 +219,8 @@ Configures the Electron window. For detailed info, see the [Electron BrowserWind
 > Multiple declarations of `apc.electron` will apply only the last declaration, ignoring previous ones.
 
 ### `font.family`
+
+Normal VS Code editor font settings remain separate from these workbench overrides.
 
 Customize font family for any part of VS Code
 
@@ -383,11 +438,28 @@ Apply custom CSS to iframes (Notebook, Extension view, etc)
   }
 ```
 
-## Demo
+## Screenshots
 
-<div style="text-align:center">
-  <img src="https://raw.githubusercontent.com/drcika/apc-extension/production/demo.png" alt="demo.png"/>
-</div>
+### Current port
+
+Two looks for the same layout: a top status bar, bottom activity bar, custom
+fonts and taller list rows. Captured in an isolated VS Code 1.145.2 instance on Linux.
+
+| Neutral layout | Blue translucent panels |
+| --- | --- |
+| ![Neutral APC layout with a top status bar and bottom activity bar](demo/layout.png) | ![Blue APC layout with translucent editor surfaces and blue bars](demo/blue-translucent.png) |
+| Custom fonts, row sizing and bar placement. | The same layout with the [blue stylesheet](demo/blue-translucent.css). |
+
+The blue example uses translucent CSS surfaces over a blue backdrop. Import
+[`demo/blue-translucent.css`](demo/blue-translucent.css) through `apc.imports`
+to try the palette; native window effects depend on the operating system.
+
+### Original upstream demo
+
+The original dark-blue setup, retained for inspiration. Its settings are in
+[`demo/settings.json`](demo/settings.json); this is a historical capture.
+
+![Original upstream APC demo with a dark-blue geometric background](demo.png)
 
 ## ⚠️ Important Notice
 

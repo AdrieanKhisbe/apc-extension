@@ -1,25 +1,7 @@
 import * as vscode from 'vscode';
-import * as fs from 'fs';
-
-const configKey = 'update.mode';
-export async function promptRestart() {
-  const config = vscode.workspace.getConfiguration();
-  const value = config.inspect(configKey);
-  await config.update(configKey, config.get(configKey) === 'default' ? 'manual' : 'default', vscode.ConfigurationTarget.Global);
-  config.update(configKey, value?.globalValue, vscode.ConfigurationTarget.Global);
-}
-
 export function getConfiguration<T>(configuration: string) {
   const config = vscode.workspace.getConfiguration();
   return config.get<T>(configuration);
-}
-
-export function getStyleFromFile(file: string) {
-  try {
-    return fs.readFileSync(file, "utf8");
-  } catch (error) {
-    return '';
-  }
 }
 
 function generateStyleFomObject(obj: Record<string, string>, styles = '') {

@@ -1,13 +1,13 @@
-.vscode/**
-.vscode-test/**
-out/**
-node_modules/**
-src/**
-.gitignore
-.yarnrc
-webpack.config.js
-vsc-extension-quickstart.md
-**/tsconfig.json
-**/.eslintrc.json
-**/*.map
-**/*.ts
+# Ship runtime assets and published documentation only.
+**
+!package.json
+!README.md
+!CONTRIBUTING.md
+!CHANGELOG.md
+!LICENSE
+!logo.png
+!demo.png
+!demo/**
+!dist/**/*.js
+!dist/**/*.json
+!resources/**
