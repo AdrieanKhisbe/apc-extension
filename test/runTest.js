@@ -124,6 +124,16 @@ async function main() {
       child.once('exit', (code, signal) => code === 0 ? resolve() : reject(new Error(`Measured-layout suite failed: ${signal || code}`)));
     });
     assert.deepEqual(fs.readFileSync(desktopPath), originalDesktop, 'Measured-layout suite must restore the renderer bundle');
+    console.log('Running webview provider lifecycle suite');
+    await new Promise((resolve, reject) => {
+      const child = spawn(process.execPath, [path.join(__dirname, 'webview.run.js')], {
+        env: { ...process.env, APC_WEBVIEW_EXECUTABLE: vscodeExecutablePath }, stdio: 'inherit',
+      });
+      child.once('error', reject);
+      child.once('exit', (code, signal) => code === 0 ? resolve() : reject(new Error(`Webview lifecycle suite failed: ${signal || code}`)));
+    });
+    assert.deepEqual(fs.readFileSync(webviewPath), originalWebview, 'Provider lifecycle suite must restore the webview template');
+
   } finally {
     // Also restore the disposable application if a suite fails before disable.
     fs.writeFileSync(htmlPath, original);

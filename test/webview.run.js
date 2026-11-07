@@ -22,7 +22,7 @@ async function main() {
   const backup = path.join(profile, 'original.html'); fs.writeFileSync(backup, original);
   const driver = path.join(profile, 'driver'); fs.mkdirSync(driver);
   fs.writeFileSync(path.join(driver, 'package.json'), JSON.stringify({ name: 'apc-webview-test', publisher: 'apc-tests', version: '0.0.0', engines: { vscode: '^1.92.0' },
-    contributes: { configuration: { properties: { 'apc.iframe.style': { type: ['object', 'string'] } } } } }));
+    contributes: { customEditors: [{ viewType: 'apc-tests.custom', displayName: 'APC lifecycle editor', selector: [{ filenamePattern: '*.apcfixture' }], priority: 'option' }], views: { explorer: [{ id: 'apc-tests.view', name: 'APC lifecycle view', type: 'webview' }] }, configuration: { properties: { 'apc.iframe.style': { type: ['object', 'string'] } } } } }));
   try {
     for (const phase of ['baseline', 'installed', 'file-updated', 'restored']) {
       await runTests({ vscodeExecutablePath: executable, extensionDevelopmentPath: driver,
