@@ -65,7 +65,24 @@ exports.run = async function (expected) {
     const viewRevealed = check(await viewReport.wait());
     assert.equal(viewRevealed.boots, viewBefore.boots, 'Retained sidebar view must preserve its script context');
     reports.sidebarView = { before: viewBefore, revealed: viewRevealed };
-    console.log('PASS: retained/revealed/moved panels, custom text editors, and sidebar webview providers preserve APC styles and script CSP.');
+    let notebookMessage;
+    const messaging = vscode.notebooks.createRendererMessaging('apc-tests.notebook-renderer');
+    disposables.push(messaging.onDidReceiveMessage(event => { notebookMessage = event.message; }));
+    disposables.push(vscode.workspace.registerNotebookSerializer('apc-tests.notebook', {
+      deserializeNotebook() {
+        const cell = new vscode.NotebookCellData(vscode.NotebookCellKind.Code, '// No execution required: stored output fixture', 'javascript');
+        cell.outputs = [new vscode.NotebookCellOutput([vscode.NotebookCellOutputItem.json({ fixture: true }, 'application/x.apc-fixture')])];
+        return new vscode.NotebookData([cell]);
+      },
+      serializeNotebook() { return Buffer.from('{}'); },
+    }));
+    const notebookFile = vscode.Uri.file(path.join(path.dirname(process.env.APC_WEBVIEW_STYLE), 'notebook.apcnb'));
+    fs.writeFileSync(notebookFile.fsPath, '{}');
+    await vscode.commands.executeCommand('vscode.openWith', notebookFile, 'apc-tests.notebook');
+    reports.notebook = await eventually(() => notebookMessage, 'Notebook output renderer did not report its applied style');
+    assert.equal(reports.notebook.marker, expected, 'Stored notebook output must inherit APC webview styling');
+    await vscode.commands.executeCommand('workbench.action.closeActiveEditor');
+    console.log('PASS: retained/revealed/moved panels, custom text editors, sidebar webview providers and notebook output preserve APC styles and script CSP.');
     return reports;
   } finally { panels.forEach(panel => panel.dispose()); disposables.forEach(item => item.dispose()); }
 };

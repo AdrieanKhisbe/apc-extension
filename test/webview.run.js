@@ -23,7 +23,8 @@ async function main() {
   const backup = path.join(profile, 'original.html'); fs.writeFileSync(backup, original);
   const driver = path.join(profile, 'driver'); fs.mkdirSync(driver);
   fs.writeFileSync(path.join(driver, 'package.json'), JSON.stringify({ name: 'apc-webview-test', publisher: 'apc-tests', version: '0.0.0', engines: { vscode: '^1.92.0' },
-    contributes: { customEditors: [{ viewType: 'apc-tests.custom', displayName: 'APC lifecycle editor', selector: [{ filenamePattern: '*.apcfixture' }], priority: 'option' }], views: { explorer: [{ id: 'apc-tests.view', name: 'APC lifecycle view', type: 'webview' }] }, configuration: { properties: { 'apc.iframe.style': { type: ['object', 'string'] } } } } }));
+    contributes: { notebooks: [{ type: 'apc-tests.notebook', displayName: 'APC lifecycle notebook', selector: [{ filenamePattern: '*.apcnb' }] }], notebookRenderer: [{ id: 'apc-tests.notebook-renderer', displayName: 'APC lifecycle renderer', entrypoint: './notebook-renderer.mjs', mimeTypes: ['application/x.apc-fixture'], requiresMessaging: 'always' }], customEditors: [{ viewType: 'apc-tests.custom', displayName: 'APC lifecycle editor', selector: [{ filenamePattern: '*.apcfixture' }], priority: 'option' }], views: { explorer: [{ id: 'apc-tests.view', name: 'APC lifecycle view', type: 'webview' }] }, configuration: { properties: { 'apc.iframe.style': { type: ['object', 'string'] } } } } }));
+  fs.copyFileSync(path.join(__dirname, 'notebook-renderer.mjs'), path.join(driver, 'notebook-renderer.mjs'));
   try {
     for (const phase of ['baseline', 'installed', 'file-updated', 'restored']) {
       await runTests({ vscodeExecutablePath: executable, extensionDevelopmentPath: driver,
