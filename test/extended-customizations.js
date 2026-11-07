@@ -67,7 +67,7 @@ let style=document.getElementById('apc-extended-styles');if(!style){style=docume
       await configure({ activityBar: { size: 56, position: 'bottom' }, statusBar: { height: 32, position: 'editor-bottom' }, 'parts.font.family': { sidebar: 'monospace', panel: 'monospace' } });
       output.appendLine('Side-panel layout fixture'); output.show(true);
       await vscode.commands.executeCommand('workbench.action.moveSideBarRight');
-      const geometry = () => cdp.evaluate(`(() => {const box=selector=>{const n=document.querySelector(selector);const r=n.getBoundingClientRect();return {x:r.x,y:r.y,width:r.width,height:r.height,right:r.right,bottom:r.bottom}};return {editor:box('.part.editor'),sidebar:box('.part.sidebar'),panel:box('.part.panel'),status:box('.part.statusbar'),activity:box('.part.activitybar')};})()`);
+      const geometry = () => cdp.evaluate(`(() => {const box=selector=>{const n=document.querySelector(selector);const r=n.getBoundingClientRect();const g=n.parentElement.getBoundingClientRect();return {x:r.x,y:r.y,width:r.width,height:r.height,right:r.right,bottom:r.bottom,gridWidth:g.width}};return {editor:box('.part.editor'),sidebar:box('.part.sidebar'),panel:box('.part.panel'),status:box('.part.statusbar'),activity:box('.part.activitybar')};})()`);
       reports.sidePanels = {};
       for (const side of ['Right', 'Left']) {
         await vscode.commands.executeCommand('workbench.action.positionPanel' + side);
@@ -78,8 +78,9 @@ let style=document.getElementById('apc-extended-styles');if(!style){style=docume
           assert.ok(g.panel.width > 50 && g.panel.height > 50, 'Panel must be visible: ' + diagnostic);
           assert.ok(beside, 'Panel must sit beside the editor: ' + diagnostic);
           assert.ok(g.sidebar.x >= g.editor.right - 1, 'Sidebar must remain on the right: ' + diagnostic);
-          assert.ok(Math.abs(g.status.width - g.editor.width) <= 1, 'Status width must match the editor: ' + diagnostic);
+          assert.ok(Math.abs(g.status.gridWidth - g.editor.gridWidth) <= 1, 'Status width must match the editor: ' + diagnostic);
           assert.ok(g.status.y >= g.editor.bottom - 1, 'Status must remain below the editor: ' + diagnostic);
+          assert.ok(g.activity.gridWidth > 1000, 'Horizontal activity bar must occupy a full grid row: ' + diagnostic);
           assert.ok(g.status.bottom <= g.activity.y + 1, 'Bottom activity bar must not overlap status: ' + diagnostic);
           return g;
         }, `Editor-relative status bar must stay below the editor with a ${side.toLowerCase()} panel and right sidebar`);

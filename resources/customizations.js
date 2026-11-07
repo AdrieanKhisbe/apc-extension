@@ -162,6 +162,31 @@
         for (const property of ['minimumWidth', 'maximumWidth']) { override(activity, property, fallback => positive(config.activityBar?.size, fallback)); }
       }
       layouts.add(state);
+      // Native sidebar/panel alignment uses fixed grid locations. Restore that
+      // topology around the native operation, then rebuild the APC placement.
+      // Moving a horizontal bar through a native vertical slot would otherwise
+      // constrain the whole content row to the bar's fixed height.
+      const adjust = owner.adjustPartPositions;
+      if (typeof adjust === 'function') {
+        owner.adjustPartPositions = function (...args) {
+          if (state.adjusting || (!state.horizontal && (!config.statusBar?.position || config.statusBar.position === 'bottom'))) {
+            return adjust.apply(this, args);
+          }
+          const desired = config;
+          state.adjusting = true;
+          try {
+            config = { ...desired, activityBar: { ...desired.activityBar, position: undefined }, statusBar: { ...desired.statusBar, position: 'bottom' } };
+            applyLayout(state);
+            return adjust.apply(this, args);
+          } finally {
+            config = desired;
+            state.position = undefined;
+            try { applyLayout(state); }
+            finally { state.adjusting = false; }
+          }
+        };
+        owner._register({ dispose() { owner.adjustPartPositions = adjust; layouts.delete(state); } });
+      }
       for (const event of ['onDidChangePanelPosition', 'onDidChangePanelAlignment']) {
         const disposable = owner[event]?.(() => queueMicrotask(() => applyLayout(state)));
         if (disposable) { owner._register(disposable); }

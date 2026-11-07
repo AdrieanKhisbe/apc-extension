@@ -87,6 +87,15 @@ async function main() {
   await new Promise(resolve => server.close(resolve));
   console.log(`Testing VS Code ${version}; isolated data: ${profile}`);
   try {
+    console.log('Running measured-layout editor suite');
+    await new Promise((resolve, reject) => {
+      const child = spawn(process.execPath, [path.join(__dirname, 'customizations-run.js')], {
+        env: { ...process.env, APC_EDITOR: vscodeExecutablePath }, stdio: 'inherit',
+      });
+      child.once('error', reject);
+      child.once('exit', (code, signal) => code === 0 ? resolve() : reject(new Error(`Measured-layout suite failed: ${signal || code}`)));
+    });
+    assert.deepEqual(fs.readFileSync(desktopPath), originalDesktop, 'Measured-layout suite must restore the renderer bundle');
     for (const suite of ['activation.test.js', 'imports.test.js', 'public-api.test.js', 'webview.integration.js', 'reload.test.js', 'disabled.test.js']) {
       console.log(`Running real-editor suite: ${suite}`);
       await runTests({
@@ -115,15 +124,6 @@ async function main() {
     assert.ok(!fs.existsSync(nativeLoaderPath), 'Disable must remove the native bootstrap');
     assert.deepEqual(fs.readFileSync(webviewPath), originalWebview, 'Disable must restore the exact webview template');
     assert.ok(!fs.existsSync(patchDirectory), 'Disable must remove all modern patch files');
-    console.log('Running measured-layout editor suite');
-    await new Promise((resolve, reject) => {
-      const child = spawn(process.execPath, [path.join(__dirname, 'customizations-run.js')], {
-        env: { ...process.env, APC_EDITOR: vscodeExecutablePath }, stdio: 'inherit',
-      });
-      child.once('error', reject);
-      child.once('exit', (code, signal) => code === 0 ? resolve() : reject(new Error(`Measured-layout suite failed: ${signal || code}`)));
-    });
-    assert.deepEqual(fs.readFileSync(desktopPath), originalDesktop, 'Measured-layout suite must restore the renderer bundle');
     console.log('Running webview provider lifecycle suite');
     await new Promise((resolve, reject) => {
       const child = spawn(process.execPath, [path.join(__dirname, 'webview.run.js')], {
