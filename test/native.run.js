@@ -1,3 +1,4 @@
+const { appRoot: resolveAppRoot } = require('./editor-paths');
 const { withBackgroundEditor } = require('./background-editor');
 // Run after compilation with Node 22: node test/native.run.js /path/to/disposable.app
 // Platform native getters + compact menu; touches only an isolated editor copy.
@@ -36,9 +37,9 @@ async function run() {
     if (mac) { assert.equal(spawnSync('cp', ['-cR', source, app]).status, 0); }
     else { fs.cpSync(path.dirname(source), app, { recursive: true }); }
   }
-  const appRoot = mac ? path.join(app, 'Contents/Resources/app') : path.join(app, 'resources/app');
-  return withBackgroundEditor(appRoot, async () => {
   const executable = mac ? path.join(app, 'Contents/MacOS/Code') : path.join(app, path.basename(source));
+  const appRoot = resolveAppRoot(executable);
+  return withBackgroundEditor(appRoot, async () => {
   const options = { opacity: 0.83, backgroundColor: '#112233', ...(mac ? { trafficLightPosition: { x: 30, y: 30 } } : {}) };
   const vscode = { env: { appRoot }, workspace: { getConfiguration: () => ({ get: key => key === 'electron' ? options : key === 'menubar.compact' }) } };
   const mod = { exports: {} };
@@ -47,7 +48,7 @@ async function run() {
   const before = new Map([...changes].map(([file]) => [file, fs.existsSync(file) ? fs.readFileSync(file) : undefined]));
   const observation = path.join(runtime, 'native.json');
   const loader = path.join(appRoot, 'out/apc-native-loader.mjs');
-  changes.set(loader, changes.get(loader) + `\nimport fs from 'node:fs'; electron.app.on('browser-window-created',(_event,win)=>setTimeout(()=>fs.writeFileSync(${JSON.stringify(observation)},JSON.stringify({ opacity:win.getOpacity(),trafficLightPosition:process.platform==='darwin'?win.getWindowButtonPosition():undefined,backgroundColor:win.getBackgroundColor(),focused:win.isFocused(),sandbox:win.webContents.getLastWebPreferences().sandbox })),1500));`);
+  changes.set(loader, changes.get(loader) + `\nimport fs from 'node:fs'; electron.app.on('browser-window-created',(_event,win)=>setTimeout(()=>fs.writeFileSync(${JSON.stringify(observation)},JSON.stringify({ opacity:win.getOpacity(),trafficLightPosition:process.platform==='darwin'?win.getWindowButtonPosition():undefined,backgroundColor:win.getBackgroundColor(),focused:win.isFocused(),focusable:win.isFocusable(),sandbox:win.webContents.getLastWebPreferences().sandbox })),1500));`);
   const evidence = { platform: process.platform, architecture: process.arch, version: JSON.parse(fs.readFileSync(path.join(appRoot, 'package.json'))).version, runtime };
   async function launch(mode, callback) {
     const profile = fs.mkdtempSync(path.join(mac ? '/tmp' : os.tmpdir(), 'apcn-'));
@@ -82,6 +83,7 @@ async function run() {
       assert.ok(Math.abs(evidence.native.opacity - options.opacity) < 0.01);
       if (mac) { assert.deepEqual(evidence.native.trafficLightPosition, options.trafficLightPosition); }
       assert.equal(evidence.native.focused, false, 'Background test windows must not acquire native focus');
+      assert.equal(evidence.native.focusable, false, 'Background test windows must reject future focus attempts');
       assert.equal(evidence.native.backgroundColor.toLowerCase(), options.backgroundColor);
       assert.equal(evidence.native.sandbox, true);
       evidence.menu = await cdp.evaluate(`({ html:[...document.querySelectorAll('.menubar')].map(el=>el.outerHTML), buttons:[...document.querySelectorAll('.menubar .menubar-menu-button')].map(el=>({label:el.getAttribute('aria-label'),width:el.getBoundingClientRect().width,height:el.getBoundingClientRect().height})) })`);

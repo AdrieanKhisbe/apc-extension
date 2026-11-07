@@ -1,3 +1,4 @@
+const { appRoot: resolveAppRoot } = require('./editor-paths');
 const { withBackgroundEditor } = require('./background-editor');
 const fs = require('node:fs');
 const os = require('node:os');
@@ -21,9 +22,7 @@ async function main() {
   // macOS IPC socket paths have a 103-character limit. Keep profiles short,
   // then copy their logs back into the checkout for CI artifact collection.
   const profile = fs.mkdtempSync(path.join(process.platform === 'darwin' ? '/tmp' : os.tmpdir(), 'apc-'));
-  const appRoot = process.platform === 'darwin'
-    ? path.resolve(path.dirname(vscodeExecutablePath), '../Resources/app')
-    : path.join(path.dirname(vscodeExecutablePath), 'resources/app');
+  const appRoot = resolveAppRoot(vscodeExecutablePath);
   return withBackgroundEditor(appRoot, async () => {
   const workbench = ['electron-browser', 'electron-sandbox'].map(kind => path.join(appRoot, 'out/vs/code', kind, 'workbench'))
     .find(base => fs.existsSync(path.join(base, 'workbench.html')));

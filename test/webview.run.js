@@ -1,3 +1,4 @@
+const { appRoot: resolveAppRoot } = require('./editor-paths');
 const { withBackgroundEditor } = require('./background-editor');
 // Standalone real-editor coverage for the webview patch preparation module.
 // The shared installation transaction/watcher is covered by the parent harness.
@@ -12,7 +13,7 @@ async function main() {
   const version = process.env.VSCODE_VERSION || '1.140.0';
   const executable = process.env.APC_WEBVIEW_EXECUTABLE || await downloadAndUnzipVSCode({ version, cachePath: path.join(root, '.vscode-test', 'webview-editor') });
   assert.ok(path.resolve(executable).startsWith(path.join(root, '.vscode-test') + path.sep), 'Use a disposable editor inside this checkout test cache');
-  const appRoot = process.platform === 'darwin' ? path.resolve(path.dirname(executable), '../Resources/app') : path.join(path.dirname(executable), 'resources/app');
+  const appRoot = resolveAppRoot(executable);
   return withBackgroundEditor(appRoot, async () => {
   const template = path.join(appRoot, 'out/vs/workbench/contrib/webview/browser/pre/index.html');
   const original = fs.readFileSync(template);

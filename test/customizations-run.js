@@ -1,3 +1,4 @@
+const { appRoot: resolveAppRoot } = require('./editor-paths');
 const { withBackgroundEditor } = require('./background-editor');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -12,7 +13,7 @@ async function main() {
   const root = path.resolve(__dirname, '..');
   const executable = process.env.APC_EDITOR;
   assert.ok(executable, 'APC_EDITOR must identify an isolated editor copy');
-  const appRoot = process.platform === 'darwin' ? path.resolve(executable, '../../Resources/app') : path.join(path.dirname(executable), 'resources/app');
+  const appRoot = resolveAppRoot(executable);
   return withBackgroundEditor(appRoot, async () => {
   const version = JSON.parse(fs.readFileSync(path.join(appRoot, 'package.json'))).version;
   const initial = { 'font.family': 'Georgia', 'parts.font.family': { statusbar: 'monospace' }, listRow: { height: 40, fontSize: 17, lists: ['explorer-folders-view'] }, header: { height: 44, fontSize: 19 }, 'sidebar.titlebar': { height: 48, fontSize: 18 }, statusBar: { height: 40, fontSize: 17 }, activityBar: { size: 68 } };
