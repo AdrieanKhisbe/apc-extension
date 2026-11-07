@@ -43,7 +43,7 @@ exports.run = async function (expected) {
     reports.retained = { before, revealed, moved };
 
     let custom;
-    disposables.push(vscode.window.registerCustomTextEditorProvider('apc-tests.custom', {
+    disposables.push(vscode.window.registerCustomEditorProvider('apc-tests.custom', {
       resolveCustomTextEditor(_document, panel) { panels.push(panel); custom = report(panel.webview, 'custom-text-editor'); },
     }));
     const customFile = path.join(path.dirname(process.env.APC_WEBVIEW_STYLE), 'custom.apcfixture'); fs.writeFileSync(customFile, 'custom editor fixture');
