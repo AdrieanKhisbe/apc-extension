@@ -315,7 +315,7 @@ test('invalid or unwritable journal files leave user colors untouched', async ()
     await assert.rejects(() => h.diskTheme().apply(), /JSON|position|property/i);
     const blocked = path.join(directory, 'blocked'); fs.writeFileSync(blocked, 'file');
     h.context.globalStorageUri = { fsPath: blocked };
-    await assert.rejects(() => h.diskTheme().apply(), /ENOTDIR/);
+    await assert.rejects(() => h.diskTheme().apply(), error => ['ENOTDIR', 'EEXIST'].includes(error.code));
     assert.deepEqual(h.settings.get('workbench.colorCustomizations'), { 'statusBar.background': '#112233' });
   } finally { fs.rmSync(directory, { recursive: true, force: true }); }
 });

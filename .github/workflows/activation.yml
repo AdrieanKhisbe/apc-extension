@@ -17,7 +17,7 @@ jobs:
       fail-fast: false
       max-parallel: 3
       matrix:
-        os: ['ubuntu-24.04', 'macos-14', 'windows-2022']
+        os: ['ubuntu-24.04', 'macos-15', 'windows-2022']
         vscode: ['1.140.0', 'stable']
     env:
       VSCODE_VERSION: ${{ matrix.vscode }}
