@@ -57,7 +57,9 @@ export function prepareWebview(_context: vscode.ExtensionContext, originals: Rea
   const script = once(original, /<script\b(?=[^>]*\btype=["']module["'])(?![^>]*\bsrc\s*=)[^>]*>([\s\S]*?)<\/script\s*>/g, 'inline module');
   const policy = once(original, /(<meta\b[^>]*http-equiv="Content-Security-Policy"[^>]*content=")([^"]*)(")/g, 'outer CSP');
   const rules = once(policy[2], /(?:^|;)\s*script-src\s+([^;]*)/g, 'script-src directive');
-  const digest = (value: string) => createHash('sha256').update(value).digest('base64');
+  // HTML input preprocessing normalizes CRLF and lone CR before the browser
+  // hashes inline script text. Windows archives can retain those bytes on disk.
+  const digest = (value: string) => createHash('sha256').update(value.replace(/\r\n?/g, '\n')).digest('base64');
   const oldHash = `'sha256-${digest(script[1])}'`;
   if (rules[1].split(/\s+/).filter(token => token === oldHash).length !== 1) {
     throw new Error('Webview inline module does not match its CSP hash');

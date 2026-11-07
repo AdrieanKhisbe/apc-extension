@@ -109,3 +109,21 @@ test('unknown or already modified webview templates fail semantic/hash preflight
     assert.equal(fs.readFileSync(f.file, 'utf8'), content);
   }
 });
+
+test('Windows line endings use browser-normalized CSP hashes without accepting changed scripts', t => {
+  const f = fixture(t);
+  f.config.set('apc.iframe.style', { body: { color: 'red' } });
+  for (const ending of ['\r\n', '\r']) {
+    const windows = f.original.replace(/\n/g, ending);
+    fs.writeFileSync(f.file, windows);
+    const patched = f.prepare().get(f.file);
+    const inline = patched.match(/<script async type="module">([\s\S]*?)<\/script>/)[1];
+    const policy = patched.match(/content="([^"]*)"/)[1];
+    assert.ok(policy.includes(`'sha256-${digest(inline.replace(/\r\n?/g, '\n'))}'`));
+    assert.equal(fs.readFileSync(f.file, 'utf8'), windows, 'Preparation must preserve the input file');
+    const changed = windows.replace('color: var(', 'background: var(');
+    fs.writeFileSync(f.file, changed);
+    assert.throws(() => f.prepare(), /does not match its CSP hash/);
+    assert.equal(fs.readFileSync(f.file, 'utf8'), changed);
+  }
+});
