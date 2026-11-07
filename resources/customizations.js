@@ -188,7 +188,10 @@
         owner._register({ dispose() { owner.adjustPartPositions = adjust; layouts.delete(state); } });
       }
       for (const event of ['onDidChangePanelPosition', 'onDidChangePanelAlignment']) {
-        const disposable = owner[event]?.(() => queueMicrotask(() => applyLayout(state)));
+        const disposable = owner[event]?.(() => queueMicrotask(() => {
+          state.position = undefined;
+          applyLayout(state);
+        }));
         if (disposable) { owner._register(disposable); }
       }
       const visibility = owner.onDidChangePartVisibility?.(event => {
