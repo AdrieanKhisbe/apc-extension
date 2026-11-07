@@ -33,6 +33,7 @@ async function main() {
   if (fs.existsSync(resultsFile)) { fs.unlinkSync(resultsFile); }
   fs.mkdirSync(path.join(profile, 'workspace'));
   for (let i = 0; i < 120; i++) { fs.writeFileSync(path.join(profile, 'workspace', `file-${String(i).padStart(3, '0')}.txt`), `file ${i}`); }
+  fs.writeFileSync(path.join(profile, 'workspace/outline-fixture.js'), "export function apcCoverageOne() { return 'APC_NEEDLE'; }\n\nexport function apcCoverageTwo() { return 'APC_NEEDLE'; }\n\nexport function apcCoverageThree() { return 'APC_NEEDLE'; }\n");
   fs.mkdirSync(path.join(profile, 'driver'));
   fs.writeFileSync(path.join(profile, 'driver/package.json'), JSON.stringify({ name: 'apc-customizations-tests', publisher: 'apc-tests', version: '0.0.0', engines: { vscode: '^1.140.0' } }));
   fs.mkdirSync(path.join(profile, 'user-data/User'), { recursive: true });

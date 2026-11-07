@@ -119,7 +119,8 @@ exports.run = async () => {
     assert.equal(restored.status.width, initial.status.width);
     assert.ok(restored.status.y >= restored.editor.bottom);
     assert.ok(restored.header.height < 48);
-    fs.writeFileSync(process.env.APC_CUSTOMIZATIONS_RESULTS, JSON.stringify({ version: vscode.version, initial, updated, bottom, editorTop, editorBottom, panelBottom, restored }, null, 2));
+    const extended = await require('./extended-customizations').run(cdp, input);
+    fs.writeFileSync(process.env.APC_CUSTOMIZATIONS_RESULTS, JSON.stringify({ version: vscode.version, initial, updated, bottom, editorTop, editorBottom, panelBottom, restored, extended }, null, 2));
     console.log('PASS: fonts, measured list geometry/live removal, header bounds, native activity/status grid sizes, horizontal activity keyboard navigation, and all status positions.');
   } finally { cdp.close(); }
 };
