@@ -1,5 +1,6 @@
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
+const path = require('node:path');
 const vscode = require('vscode');
 const { connect, eventually } = require('./cdp');
 
@@ -76,6 +77,13 @@ exports.run = async () => {
     }
     const screenshot = await cdp.send('Page.captureScreenshot', { format: 'png' });
     fs.writeFileSync(process.env.APC_CUSTOMIZATIONS_RESULTS.replace(/\.json$/, '.png'), Buffer.from(screenshot.data, 'base64'));
+    // Capture a reusable stylesheet example separately from the geometry evidence.
+    const blueStyle = fs.readFileSync(path.join(__dirname, '../demo/blue-translucent.css'), 'utf8');
+    try {
+      await cdp.evaluate(`(() => {const style=document.createElement('style');style.id='apc-showcase-blue';style.textContent=${JSON.stringify(blueStyle)};document.head.appendChild(style);return new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));})()`);
+      const blueScreenshot = await cdp.send('Page.captureScreenshot', { format: 'png' });
+      fs.writeFileSync(process.env.APC_CUSTOMIZATIONS_RESULTS.replace(/\.json$/, '-blue.png'), Buffer.from(blueScreenshot.data, 'base64'));
+    } finally { await cdp.evaluate(`document.getElementById('apc-showcase-blue')?.remove();true`); }
     await cdp.evaluate(`globalThis.__apcCustomizations.configure({activityBar:{size:56,position:'bottom'},statusBar:{height:32,position:'editor-top'}});true`);
     const editorTop = await snapshot();
     assert.ok(editorTop.status.bottom <= editorTop.editor.y && editorTop.editor.y - editorTop.status.bottom <= 8, 'Editor-top status bar must reserve space above the editor');
