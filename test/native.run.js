@@ -1,10 +1,11 @@
 const { withBackgroundEditor } = require('./background-editor');
 // Run after compilation with Node 22: node test/native.run.js /path/to/disposable.app
-// macOS control + native getters + real compact menu; touches only an APFS clone.
+// Platform native getters + compact menu; touches only an isolated editor copy.
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
+const os = require('node:os');
 const { spawn, spawnSync } = require('node:child_process');
 const { connect, eventually } = require('./cdp');
 
@@ -29,12 +30,16 @@ async function run() {
   const cache = path.join(root, '.vscode-test');
   fs.mkdirSync(cache, { recursive: true });
   const runtime = fs.mkdtempSync(path.join(cache, 'native-runtime-'));
-  const app = process.env.APC_NATIVE_TEST_APP || path.join(runtime, 'Visual Studio Code.app');
-  if (!process.env.APC_NATIVE_TEST_APP) { assert.equal(spawnSync('cp', ['-cR', source, app]).status, 0); }
-  const appRoot = path.join(app, 'Contents/Resources/app');
+  const mac = process.platform === 'darwin';
+  const app = process.env.APC_NATIVE_TEST_APP || path.join(runtime, mac ? 'Visual Studio Code.app' : 'editor');
+  if (!process.env.APC_NATIVE_TEST_APP) {
+    if (mac) { assert.equal(spawnSync('cp', ['-cR', source, app]).status, 0); }
+    else { fs.cpSync(path.dirname(source), app, { recursive: true }); }
+  }
+  const appRoot = mac ? path.join(app, 'Contents/Resources/app') : path.join(app, 'resources/app');
   return withBackgroundEditor(appRoot, async () => {
-  const executable = path.join(app, 'Contents/MacOS/Code');
-  const options = { opacity: 0.83, trafficLightPosition: { x: 30, y: 30 }, backgroundColor: '#112233' };
+  const executable = mac ? path.join(app, 'Contents/MacOS/Code') : path.join(app, path.basename(source));
+  const options = { opacity: 0.83, backgroundColor: '#112233', ...(mac ? { trafficLightPosition: { x: 30, y: 30 } } : {}) };
   const vscode = { env: { appRoot }, workspace: { getConfiguration: () => ({ get: key => key === 'electron' ? options : key === 'menubar.compact' }) } };
   const mod = { exports: {} };
   vm.runInThisContext(`(function(require,module,exports){${fs.readFileSync(path.join(root, 'dist/native.js'), 'utf8')}\n})`)(id => id === 'vscode' ? vscode : require(id), mod, mod.exports);
@@ -42,10 +47,10 @@ async function run() {
   const before = new Map([...changes].map(([file]) => [file, fs.existsSync(file) ? fs.readFileSync(file) : undefined]));
   const observation = path.join(runtime, 'native.json');
   const loader = path.join(appRoot, 'out/apc-native-loader.mjs');
-  changes.set(loader, changes.get(loader) + `\nimport fs from 'node:fs'; electron.app.on('browser-window-created',(_event,win)=>setTimeout(()=>fs.writeFileSync(${JSON.stringify(observation)},JSON.stringify({ opacity:win.getOpacity(),trafficLightPosition:win.getWindowButtonPosition(),backgroundColor:win.getBackgroundColor(),sandbox:win.webContents.getLastWebPreferences().sandbox })),1500));`);
-  const evidence = { version: JSON.parse(fs.readFileSync(path.join(appRoot, 'package.json'))).version, runtime };
+  changes.set(loader, changes.get(loader) + `\nimport fs from 'node:fs'; electron.app.on('browser-window-created',(_event,win)=>setTimeout(()=>fs.writeFileSync(${JSON.stringify(observation)},JSON.stringify({ opacity:win.getOpacity(),trafficLightPosition:process.platform==='darwin'?win.getWindowButtonPosition():undefined,backgroundColor:win.getBackgroundColor(),focused:win.isFocused(),sandbox:win.webContents.getLastWebPreferences().sandbox })),1500));`);
+  const evidence = { platform: process.platform, architecture: process.arch, version: JSON.parse(fs.readFileSync(path.join(appRoot, 'package.json'))).version, runtime };
   async function launch(mode, callback) {
-    const profile = fs.mkdtempSync('/tmp/apcn-');
+    const profile = fs.mkdtempSync(path.join(mac ? '/tmp' : os.tmpdir(), 'apcn-'));
     fs.mkdirSync(path.join(profile, 'User'));
     fs.writeFileSync(path.join(profile, 'User/settings.json'), JSON.stringify({ 'update.mode': 'none', 'telemetry.telemetryLevel': 'off', 'window.titleBarStyle': 'custom', 'window.menuStyle': 'custom', 'security.workspace.trust.enabled': false }));
     const server = require('node:net').createServer();
@@ -63,7 +68,8 @@ async function run() {
       await callback(cdp, port);
     } finally {
       cdp?.close();
-      child.kill('SIGTERM');
+      if (process.platform === 'win32') { spawnSync('taskkill', ['/PID', String(child.pid), '/T', '/F']); }
+      else { child.kill('SIGTERM'); }
       await new Promise(resolve => { if (child.exitCode !== null || child.signalCode) { resolve(); } else { child.once('exit', resolve); setTimeout(resolve, 5000); } });
     }
   }
@@ -74,7 +80,8 @@ async function run() {
       await eventually(() => fs.existsSync(observation), 'Native window observation unavailable');
       evidence.native = JSON.parse(fs.readFileSync(observation));
       assert.ok(Math.abs(evidence.native.opacity - options.opacity) < 0.01);
-      assert.deepEqual(evidence.native.trafficLightPosition, options.trafficLightPosition);
+      if (mac) { assert.deepEqual(evidence.native.trafficLightPosition, options.trafficLightPosition); }
+      assert.equal(evidence.native.focused, false, 'Background test windows must not acquire native focus');
       assert.equal(evidence.native.backgroundColor.toLowerCase(), options.backgroundColor);
       assert.equal(evidence.native.sandbox, true);
       evidence.menu = await cdp.evaluate(`({ html:[...document.querySelectorAll('.menubar')].map(el=>el.outerHTML), buttons:[...document.querySelectorAll('.menubar .menubar-menu-button')].map(el=>({label:el.getAttribute('aria-label'),width:el.getBoundingClientRect().width,height:el.getBoundingClientRect().height})) })`);

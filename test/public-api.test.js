@@ -9,7 +9,7 @@ exports.run = async function () {
   await vscode.extensions.getExtension('drcika.apc-extension').activate();
   const cdp = await connect(process.env.APC_CDP_PORT);
   const config = vscode.workspace.getConfiguration();
-  const platform = process.platform === 'darwin' ? 'osx' : 'linux';
+  const platform = process.platform === 'darwin' ? 'osx' : process.platform === 'win32' ? 'windows' : 'linux';
   const settings = ['apc.buttons', 'apc.theme', 'apc.statusBar', 'workbench.colorCustomizations',
     `terminal.integrated.profiles.${platform}`, `terminal.integrated.defaultProfile.${platform}`];
   const original = new Map(settings.map(key => [key, config.inspect(key)?.globalValue]));
@@ -23,7 +23,9 @@ exports.run = async function () {
   const terminals = [];
   const terminalListener = vscode.window.onDidOpenTerminal(terminal => terminals.push(terminal));
   const output = path.join(process.env.APC_FIXTURE, 'button-command.txt');
-  const terminalCommand = `printf APC_TERMINAL_TEST > '${output.replaceAll("'", "'\\''")}'`;
+  const terminalCommand = process.platform === 'win32'
+    ? `[IO.File]::WriteAllText('${output.replaceAll("'", "''")}', 'APC_TERMINAL_TEST')`
+    : `printf APC_TERMINAL_TEST > '${output.replaceAll("'", "'\\''")}'`;
   const generatedCommand = `apc.${terminalCommand.replace(/\s/g, '.')}`;
   try {
     // Exercise button creation at activation, before any configuration rebuild.
@@ -64,7 +66,7 @@ exports.run = async function () {
     await eventually(async () => JSON.stringify(await statusHeight()) === '[30,30]', 'Returning to a previous configuration must reapply it');
 
     // A real terminal command proves the generated registration is usable.
-    await update(`terminal.integrated.profiles.${platform}`, { 'APC test shell': { path: '/bin/sh', args: [] } });
+    await update(`terminal.integrated.profiles.${platform}`, { 'APC test shell': { path: process.platform === 'win32' ? 'pwsh.exe' : '/bin/sh', args: [] } });
     await update(`terminal.integrated.defaultProfile.${platform}`, 'APC test shell');
     await update('apc.buttons', [{ text: 'APC check terminal', command: terminalCommand }]);
     await eventually(async () => (await labels()).includes('APC check terminal'), 'Terminal button was not rendered');
