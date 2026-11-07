@@ -438,11 +438,28 @@ Apply custom CSS to iframes (Notebook, Extension view, etc)
   }
 ```
 
-## Demo
+## Screenshots
 
-<div style="text-align:center">
-  <img src="https://raw.githubusercontent.com/drcika/apc-extension/production/demo.png" alt="demo.png"/>
-</div>
+### Current port
+
+Two looks for the same layout: a top status bar, bottom activity bar, custom
+fonts and taller list rows. Captured in an isolated VS Code 1.145.2 instance on Linux.
+
+| Neutral layout | Blue translucent panels |
+| --- | --- |
+| ![Neutral APC layout with a top status bar and bottom activity bar](demo/layout.png) | ![Blue APC layout with translucent editor surfaces and blue bars](demo/blue-translucent.png) |
+| Custom fonts, row sizing and bar placement. | The same layout with the [blue stylesheet](demo/blue-translucent.css). |
+
+The blue example uses translucent CSS surfaces over a blue backdrop. Import
+[`demo/blue-translucent.css`](demo/blue-translucent.css) through `apc.imports`
+to try the palette; native window effects depend on the operating system.
+
+### Original upstream demo
+
+The original dark-blue setup, retained for inspiration. Its settings are in
+[`demo/settings.json`](demo/settings.json); this is a historical capture.
+
+![Original upstream APC demo with a dark-blue geometric background](demo.png)
 
 ## ⚠️ Important Notice
 
