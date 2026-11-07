@@ -35,7 +35,7 @@ async function main() {
   for (let i = 0; i < 120; i++) { fs.writeFileSync(path.join(profile, 'workspace', `file-${String(i).padStart(3, '0')}.txt`), `file ${i}`); }
   fs.writeFileSync(path.join(profile, 'workspace/outline-fixture.js'), "export function apcCoverageOne() { return 'APC_NEEDLE'; }\n\nexport function apcCoverageTwo() { return 'APC_NEEDLE'; }\n\nexport function apcCoverageThree() { return 'APC_NEEDLE'; }\n");
   fs.mkdirSync(path.join(profile, 'driver'));
-  fs.writeFileSync(path.join(profile, 'driver/package.json'), JSON.stringify({ name: 'apc-customizations-tests', publisher: 'apc-tests', version: '0.0.0', engines: { vscode: '^1.140.0' } }));
+  fs.writeFileSync(path.join(profile, 'driver/package.json'), JSON.stringify({ name: 'apc-customizations-tests', publisher: 'apc-tests', version: '0.0.0', engines: { vscode: '^1.140.0' }, contributes: { configuration: JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8')).contributes.configuration } }));
   fs.mkdirSync(path.join(profile, 'user-data/User'), { recursive: true });
   fs.writeFileSync(path.join(profile, 'user-data/User/settings.json'), JSON.stringify({ 'security.workspace.trust.enabled': false, 'workbench.startupEditor': 'none', 'workbench.secondarySideBar.defaultVisibility': 'hidden' }));
   const server = net.createServer();
