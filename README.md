@@ -23,25 +23,29 @@ webview styling on module-based VS Code. Tested coverage is listed separately.
 Requires VS Code 1.140.0 or newer. Compatibility is tested on 1.140.0 and the
 latest stable release; the old AMD implementation has been removed.
 
-| Feature | Implemented | Tested |
-| --- | --- | --- |
-| Activation, enable/disable, restoration | ✅ Modern editor lifecycle and reversible patching | ✅ Automated lifecycle and real-editor checks |
-| Local `.css`/`.js` imports | ✅ Absolute paths, `file://`, `${userHome}`, import objects | ✅ Automated publication and real-editor imports |
-| HTTP(S) import objects | ✅ Configured script/style origins | ✅ Real-editor loading under CSP |
-| `apc.stylesheet` | ✅ Live configuration updates | ✅ Real-editor changes and removal |
-| Live local file updates | ✅ Including atomic saves | ✅ Repeated atomic CSS saves, CSS/JS updates, deduplication and failure recovery |
-| `apc.buttons` | ✅ Status-bar commands, terminal buttons and live SCM counts | ✅ Startup, clicks, priority, terminal execution, Git counts, repository lifecycle, cleanup and re-enable |
-| `apc.theme` | ✅ Startup/live colors and persistent restoration on removal/disable | ✅ Lifecycle, reopening, manual-edit preservation, interrupted writes, renderer colors and disabled-state gating |
-| Font overrides | ✅ Global, monospace and per-part styles | 🟡 All part selectors in unit tests; global/sidebar/tab/panel and auxiliary-window fonts in editor; remaining combinations unverified |
-| List row/header dimensions | ✅ Virtualized measurements, font sizes and tab/sidebar headers | 🟡 Default delegates and special rows in unit tests; Explorer/Search/Outline/SCM geometry, pointer selection, scrolling, live updates and reset in editor |
-| Activity/status bar layout | ✅ Measured sizing, horizontal bottom activity bar and four status positions | 🟡 Four status positions, visibility, sidebars/panels, Zen and native fullscreen enter/exit, live placement, navigation and reset; exhaustive combinations unverified |
-| `apc.electron`, compact menubar | ✅ Documented window options and compact menus | 🟡 macOS/Windows window getters, sandbox preservation, unfocused test windows, mouse/keyboard menus and restoration; compositor effects unverified |
-| Iframe/webview styling | ✅ Object/file CSS, file watching and restoration | 🟡 CSP/theme/recreation, retained panels, custom editors, sidebar views, notebook output, Markdown edits/refresh/reopen and nested-frame boundaries; provider serialization across restarts unverified |
+| Feature | Implemented | Tested | Remaining coverage |
+| --- | --- | --- | --- |
+| Activation, enable/disable, restoration | ✅ Modern lifecycle and reversible patching | ✅ Automated lifecycle and real-editor checks | — |
+| Local `.css`/`.js` imports | ✅ Absolute paths, `file://`, `${userHome}`, import objects | ✅ Publication and real-editor imports | — |
+| HTTP(S) import objects | ✅ Configured script/style origins | ✅ Real-editor loading under CSP | — |
+| `apc.stylesheet` | ✅ Live configuration updates | ✅ Real-editor changes and removal | — |
+| Live local file updates | ✅ Including atomic saves | ✅ Repeated atomic CSS saves, CSS/JS updates, deduplication and failure recovery | — |
+| `apc.buttons` | ✅ Commands, terminals and live SCM counts | ✅ Clicks, priority, terminal execution, Git counts, repository lifecycle, cleanup and re-enable | — |
+| `apc.theme` | ✅ Startup/live colors and persistent restoration | ✅ Reopening, manual-edit preservation, interrupted writes, renderer colors and disabled-state gating | — |
+| Font overrides | ✅ Global, monospace and per-part styles | ✅ All part selectors in unit tests; global/sidebar/tab/panel/status fonts and auxiliary-window tab/monospace scopes in editors | 🟡 Real-editor auxiliary-bar, titlebar, banner, menu, settings and extension-editor font rendering |
+| List row/header dimensions | ✅ Virtualized measurements, font sizes and headers | ✅ Unit delegates/special rows; real Explorer/Search/Outline/SCM sizing; Explorer/Search/Outline pointer navigation; Explorer scrolling, live updates and reset | 🟡 Real debug/custom/open-editor lists and input/action row geometry |
+| Activity/status bar layout | ✅ Measured sizing, bottom activity bar and four status positions | ✅ Positions, visibility, sidebars/panels, grid bounds, keyboard navigation, live changes and reset | 🟡 Split editor groups combined with side panels |
+| Zen / fullscreen compatibility | ✅ Custom layout follows mode visibility and restoration | ✅ Zen, native fullscreen and combined enter/exit; native events/getters, hidden bars/tabs, live placement and restored sizes | 🟡 Zen/fullscreen in auxiliary windows |
+| `apc.electron`, compact menubar | ✅ Documented window options and compact menus | ✅ macOS/Windows getters, sandbox preservation, background focus, mouse/keyboard menus and restoration | 🟡 Vibrancy, Mica, transparency and frame appearance |
+| Iframe/webview styling | ✅ Object/file CSS, watching and restoration | ✅ CSP/theme/recreation, retained panels, custom editors, sidebar views, notebook output, Markdown edits/refresh/reopen and nested-frame boundaries | 🟡 Provider serialization across restarts; remote embedded content |
 
-✅ = implemented or automated checks passed for the stated scope; 🟡 = partial
-implementation or coverage. CI runs VS Code 1.140.0 and current stable on Linux,
-macOS and Windows, including native-window/menu probes on macOS and Windows.
-Unknown internal layouts are rejected before application files are changed.
+✅ describes implementation or checks passed for the stated scope. 🟡 appears
+only under remaining coverage; it does not downgrade the passing checks.
+
+CI runs VS Code 1.140.0 and current stable on Linux, macOS and Windows, including
+native-window/menu probes on macOS and Windows. The [latest full verification](https://github.com/AdrieanKhisbe/apc-extension/actions/runs/42476480627)
+passed on 1.140.0 and 1.145.2 at `e3f0f47`. Unknown internal layouts are rejected
+before application files are changed.
 
 `apc.theme` overrides only the listed global color tokens. Removing tokens or
 disabling APC restores their previous values, including across editor restarts;
@@ -254,7 +258,8 @@ Change default font family for individual sections
   "apc.parts.font.family": {
     "sidebar": "Roboto Mono",
     "titlebar": "Roboto Mono",
-    "activityBar": "Roboto Mono",
+    "auxiliarybar": "Roboto Mono",
+    "banner": "Roboto Mono",
     "panel": "Roboto Mono",
     "tabs": "Roboto Mono",
     "statusbar": "Roboto Mono",
