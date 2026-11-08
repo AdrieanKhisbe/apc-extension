@@ -1,0 +1,709 @@
+{
+  "version": "1.140.0",
+  "initial": {
+    "rows": [
+      {
+        "top": 0,
+        "height": 40
+      },
+      {
+        "top": 40,
+        "height": 40
+      },
+      {
+        "top": 80,
+        "height": 40
+      },
+      {
+        "top": 120,
+        "height": 40
+      }
+    ],
+    "sidebar": {
+      "x": 68,
+      "y": 35,
+      "width": 280,
+      "height": 821,
+      "bottom": 856,
+      "right": 348,
+      "font": "Georgia",
+      "fontSize": "13px",
+      "parentHeight": 825,
+      "parentWidth": 280
+    },
+    "header": {
+      "x": 69,
+      "y": 36,
+      "width": 278,
+      "height": 48,
+      "bottom": 84,
+      "right": 347,
+      "font": "Georgia",
+      "fontSize": "18px",
+      "parentHeight": 821,
+      "parentWidth": 280
+    },
+    "content": {
+      "x": 69,
+      "y": 84,
+      "width": 277,
+      "height": 771,
+      "bottom": 855,
+      "right": 346,
+      "font": "Georgia",
+      "fontSize": "13px",
+      "parentHeight": 821,
+      "parentWidth": 280
+    },
+    "status": {
+      "x": 0,
+      "y": 860,
+      "width": 1440,
+      "height": 40,
+      "bottom": 900,
+      "right": 1440,
+      "font": "monospace",
+      "fontSize": "17px",
+      "parentHeight": 40,
+      "parentWidth": 1440
+    },
+    "activity": {
+      "x": 4,
+      "y": 35,
+      "width": 64,
+      "height": 821,
+      "bottom": 856,
+      "right": 68,
+      "font": "Georgia",
+      "fontSize": "13px",
+      "parentHeight": 825,
+      "parentWidth": 68
+    },
+    "editor": {
+      "x": 352,
+      "y": 35,
+      "width": 1084,
+      "height": 821,
+      "bottom": 856,
+      "right": 1436,
+      "font": "Georgia",
+      "fontSize": "13px",
+      "parentHeight": 825,
+      "parentWidth": 1092
+    },
+    "panel": {
+      "x": 0,
+      "y": 0,
+      "width": 0,
+      "height": 0,
+      "bottom": 0,
+      "right": 0,
+      "font": "Georgia",
+      "fontSize": "13px",
+      "parentHeight": 0,
+      "parentWidth": 0
+    },
+    "tabs": {
+      "x": 353,
+      "y": 36,
+      "width": 1026,
+      "height": 44,
+      "bottom": 80,
+      "right": 1379,
+      "font": "Georgia",
+      "fontSize": "19px",
+      "parentHeight": 44,
+      "parentWidth": 1026
+    },
+    "font": "Georgia"
+  },
+  "updated": {
+    "rows": [
+      {
+        "top": 0,
+        "height": 30
+      },
+      {
+        "top": 30,
+        "height": 30
+      },
+      {
+        "top": 60,
+        "height": 30
+      },
+      {
+        "top": 90,
+        "height": 30
+      }
+    ],
+    "sidebar": {
+      "x": 56,
+      "y": 67,
+      "width": 292,
+      "height": 829,
+      "bottom": 896,
+      "right": 348,
+      "font": "Georgia",
+      "fontSize": "13px",
+      "parentHeight": 833,
+      "parentWidth": 292
+    },
+    "header": {
+      "x": 57,
+      "y": 68,
+      "width": 290,
+      "height": 40,
+      "bottom": 108,
+      "right": 347,
+      "font": "Georgia",
+      "fontSize": "18px",
+      "parentHeight": 829,
+      "parentWidth": 292
+    },
+    "content": {
+      "x": 57,
+      "y": 108,
+      "width": 289,
+      "height": 787,
+      "bottom": 895,
+      "right": 346,
+      "font": "Georgia",
+      "fontSize": "13px",
+      "parentHeight": 829,
+      "parentWidth": 292
+    },
+    "status": {
+      "x": 0,
+      "y": 0,
+      "width": 1440,
+      "height": 32,
+      "bottom": 32,
+      "right": 1440,
+      "font": "monospace",
+      "fontSize": "17px",
+      "parentHeight": 32,
+      "parentWidth": 1440
+    },
+    "activity": {
+      "x": 4,
+      "y": 67,
+      "width": 52,
+      "height": 829,
+      "bottom": 896,
+      "right": 56,
+      "font": "Georgia",
+      "fontSize": "13px",
+      "parentHeight": 833,
+      "parentWidth": 56
+    },
+    "editor": {
+      "x": 352,
+      "y": 67,
+      "width": 1084,
+      "height": 829,
+      "bottom": 896,
+      "right": 1436,
+      "font": "Georgia",
+      "fontSize": "13px",
+      "parentHeight": 833,
+      "parentWidth": 1092
+    },
+    "panel": {
+      "x": 0,
+      "y": 0,
+      "width": 0,
+      "height": 0,
+      "bottom": 0,
+      "right": 0,
+      "font": "Georgia",
+      "fontSize": "13px",
+      "parentHeight": 0,
+      "parentWidth": 0
+    },
+    "tabs": {
+      "x": 353,
+      "y": 68,
+      "width": 1026,
+      "height": 36,
+      "bottom": 104,
+      "right": 1379,
+      "font": "Georgia",
+      "fontSize": "19px",
+      "parentHeight": 36,
+      "parentWidth": 1026
+    },
+    "font": "Georgia"
+  },
+  "bottom": {
+    "rows": [
+      {
+        "top": 0,
+        "height": 30
+      },
+      {
+        "top": 30,
+        "height": 30
+      },
+      {
+        "top": 60,
+        "height": 30
+      },
+      {
+        "top": 90,
+        "height": 30
+      }
+    ],
+    "sidebar": {
+      "x": 0,
+      "y": 67,
+      "width": 292,
+      "height": 773,
+      "bottom": 840,
+      "right": 292,
+      "font": "Georgia",
+      "fontSize": "13px",
+      "parentHeight": 777,
+      "parentWidth": 292
+    },
+    "header": {
+      "x": 1,
+      "y": 68,
+      "width": 290,
+      "height": 32,
+      "bottom": 100,
+      "right": 291,
+      "font": "Georgia",
+      "fontSize": "18px",
+      "parentHeight": 773,
+      "parentWidth": 292
+    },
+    "content": {
+      "x": 1,
+      "y": 100,
+      "width": 289,
+      "height": 739,
+      "bottom": 839,
+      "right": 290,
+      "font": "Georgia",
+      "fontSize": "13px",
+      "parentHeight": 773,
+      "parentWidth": 292
+    },
+    "status": {
+      "x": 0,
+      "y": 0,
+      "width": 1440,
+      "height": 32,
+      "bottom": 32,
+      "right": 1440,
+      "font": "monospace",
+      "fontSize": "17px",
+      "parentHeight": 32,
+      "parentWidth": 1440
+    },
+    "activity": {
+      "x": 4,
+      "y": 844,
+      "width": 1432,
+      "height": 52,
+      "bottom": 896,
+      "right": 1436,
+      "font": "Georgia",
+      "fontSize": "13px",
+      "parentHeight": 56,
+      "parentWidth": 1440
+    },
+    "editor": {
+      "x": 296,
+      "y": 67,
+      "width": 1140,
+      "height": 773,
+      "bottom": 840,
+      "right": 1436,
+      "font": "Georgia",
+      "fontSize": "13px",
+      "parentHeight": 777,
+      "parentWidth": 1148
+    },
+    "panel": {
+      "x": 0,
+      "y": 0,
+      "width": 0,
+      "height": 0,
+      "bottom": 0,
+      "right": 0,
+      "font": "Georgia",
+      "fontSize": "13px",
+      "parentHeight": 0,
+      "parentWidth": 0
+    },
+    "tabs": {
+      "x": 297,
+      "y": 68,
+      "width": 1082,
+      "height": 33,
+      "bottom": 101,
+      "right": 1379,
+      "font": "Georgia",
+      "fontSize": "19px",
+      "parentHeight": 33,
+      "parentWidth": 1082
+    },
+    "font": "Georgia"
+  },
+  "editorTop": {
+    "rows": [
+      {
+        "top": 0,
+        "height": 22
+      },
+      {
+        "top": 22,
+        "height": 22
+      },
+      {
+        "top": 44,
+        "height": 22
+      },
+      {
+        "top": 66,
+        "height": 22
+      }
+    ],
+    "sidebar": {
+      "x": 0,
+      "y": 35,
+      "width": 292,
+      "height": 805,
+      "bottom": 840,
+      "right": 292,
+      "font": "Georgia",
+      "fontSize": "13px",
+      "parentHeight": 809,
+      "parentWidth": 292
+    },
+    "header": {
+      "x": 1,
+      "y": 36,
+      "width": 290,
+      "height": 32,
+      "bottom": 68,
+      "right": 291,
+      "font": "Georgia",
+      "fontSize": "18px",
+      "parentHeight": 805,
+      "parentWidth": 292
+    },
+    "content": {
+      "x": 1,
+      "y": 68,
+      "width": 289,
+      "height": 771,
+      "bottom": 839,
+      "right": 290,
+      "font": "Georgia",
+      "fontSize": "13px",
+      "parentHeight": 805,
+      "parentWidth": 292
+    },
+    "status": {
+      "x": 292,
+      "y": 35,
+      "width": 1148,
+      "height": 32,
+      "bottom": 67,
+      "right": 1440,
+      "font": "monospace",
+      "fontSize": "17px",
+      "parentHeight": 32,
+      "parentWidth": 1148
+    },
+    "activity": {
+      "x": 4,
+      "y": 844,
+      "width": 1432,
+      "height": 52,
+      "bottom": 896,
+      "right": 1436,
+      "font": "Georgia",
+      "fontSize": "13px",
+      "parentHeight": 56,
+      "parentWidth": 1440
+    },
+    "editor": {
+      "x": 296,
+      "y": 67,
+      "width": 1140,
+      "height": 773,
+      "bottom": 840,
+      "right": 1436,
+      "font": "Georgia",
+      "fontSize": "13px",
+      "parentHeight": 777,
+      "parentWidth": 1148
+    },
+    "panel": {
+      "x": 0,
+      "y": 0,
+      "width": 0,
+      "height": 0,
+      "bottom": 0,
+      "right": 0,
+      "font": "Georgia",
+      "fontSize": "13px",
+      "parentHeight": 0,
+      "parentWidth": 0
+    },
+    "tabs": {
+      "x": 297,
+      "y": 68,
+      "width": 1082,
+      "height": 33,
+      "bottom": 101,
+      "right": 1379,
+      "font": "Georgia",
+      "fontSize": "19px",
+      "parentHeight": 33,
+      "parentWidth": 1082
+    },
+    "font": "Georgia"
+  },
+  "editorBottom": {
+    "rows": [
+      {
+        "top": 0,
+        "height": 22
+      },
+      {
+        "top": 22,
+        "height": 22
+      },
+      {
+        "top": 44,
+        "height": 22
+      },
+      {
+        "top": 66,
+        "height": 22
+      }
+    ],
+    "sidebar": {
+      "x": 0,
+      "y": 35,
+      "width": 292,
+      "height": 805,
+      "bottom": 840,
+      "right": 292,
+      "font": "Georgia",
+      "fontSize": "13px",
+      "parentHeight": 809,
+      "parentWidth": 292
+    },
+    "header": {
+      "x": 1,
+      "y": 36,
+      "width": 290,
+      "height": 32,
+      "bottom": 68,
+      "right": 291,
+      "font": "Georgia",
+      "fontSize": "18px",
+      "parentHeight": 805,
+      "parentWidth": 292
+    },
+    "content": {
+      "x": 1,
+      "y": 68,
+      "width": 289,
+      "height": 771,
+      "bottom": 839,
+      "right": 290,
+      "font": "Georgia",
+      "fontSize": "13px",
+      "parentHeight": 805,
+      "parentWidth": 292
+    },
+    "status": {
+      "x": 292,
+      "y": 812,
+      "width": 1148,
+      "height": 32,
+      "bottom": 844,
+      "right": 1440,
+      "font": "monospace",
+      "fontSize": "17px",
+      "parentHeight": 32,
+      "parentWidth": 1148
+    },
+    "activity": {
+      "x": 4,
+      "y": 844,
+      "width": 1432,
+      "height": 52,
+      "bottom": 896,
+      "right": 1436,
+      "font": "Georgia",
+      "fontSize": "13px",
+      "parentHeight": 56,
+      "parentWidth": 1440
+    },
+    "editor": {
+      "x": 296,
+      "y": 35,
+      "width": 1140,
+      "height": 773,
+      "bottom": 808,
+      "right": 1436,
+      "font": "Georgia",
+      "fontSize": "13px",
+      "parentHeight": 777,
+      "parentWidth": 1148
+    },
+    "panel": {
+      "x": 0,
+      "y": 0,
+      "width": 0,
+      "height": 0,
+      "bottom": 0,
+      "right": 0,
+      "font": "Georgia",
+      "fontSize": "13px",
+      "parentHeight": 0,
+      "parentWidth": 0
+    },
+    "tabs": {
+      "x": 297,
+      "y": 36,
+      "width": 1082,
+      "height": 33,
+      "bottom": 69,
+      "right": 1379,
+      "font": "Georgia",
+      "fontSize": "19px",
+      "parentHeight": 33,
+      "parentWidth": 1082
+    },
+    "font": "Georgia"
+  },
+  "panelBottom": {
+    "rows": [
+      {
+        "top": 0,
+        "height": 22
+      },
+      {
+        "top": 22,
+        "height": 22
+      },
+      {
+        "top": 44,
+        "height": 22
+      },
+      {
+        "top": 66,
+        "height": 22
+      }
+    ],
+    "sidebar": {
+      "x": 0,
+      "y": 35,
+      "width": 292,
+      "height": 805,
+      "bottom": 840,
+      "right": 292,
+      "font": "Georgia",
+      "fontSize": "13px",
+      "parentHeight": 809,
+      "parentWidth": 292
+    },
+    "header": {
+      "x": 1,
+      "y": 36,
+      "width": 290,
+      "height": 32,
+      "bottom": 68,
+      "right": 291,
+      "font": "Georgia",
+      "fontSize": "18px",
+      "parentHeight": 805,
+      "parentWidth": 292
+    },
+    "content": {
+      "x": 1,
+      "y": 68,
+      "width": 289,
+      "height": 771,
+      "bottom": 839,
+      "right": 290,
+      "font": "Georgia",
+      "fontSize": "13px",
+      "parentHeight": 805,
+      "parentWidth": 292
+    },
+    "status": {
+      "x": 292,
+      "y": 812,
+      "width": 1148,
+      "height": 32,
+      "bottom": 844,
+      "right": 1440,
+      "font": "monospace",
+      "fontSize": "17px",
+      "parentHeight": 32,
+      "parentWidth": 1148
+    },
+    "activity": {
+      "x": 4,
+      "y": 844,
+      "width": 1432,
+      "height": 52,
+      "bottom": 896,
+      "right": 1436,
+      "font": "Georgia",
+      "fontSize": "13px",
+      "parentHeight": 56,
+      "parentWidth": 1440
+    },
+    "editor": {
+      "x": 296,
+      "y": 35,
+      "width": 1140,
+      "height": 477,
+      "bottom": 512,
+      "right": 1436,
+      "font": "Georgia",
+      "fontSize": "13px",
+      "parentHeight": 477,
+      "parentWidth": 1148
+    },
+    "panel": {
+      "x": 296,
+      "y": 516,
+      "width": 1140,
+      "height": 292,
+      "bottom": 808,
+      "right": 1436,
+      "font": "Georgia",
+      "fontSize": "13px",
+      "parentHeight": 300,
+      "parentWidth": 1148
+    },
+    "tabs": {
+      "x": 297,
+      "y": 36,
+      "width": 1082,
+      "height": 33,
+      "bottom": 69,
+      "right": 1379,
+      "font": "Georgia",
+      "fontSize": "19px",
+      "parentHeight": 33,
+      "parentWidth": 1082
+    },
+    "font": "Georgia"
+  },
+  "restored": true,
+  "platform": "darwin",
+  "architecture": "arm64",
+  "originalBundleSha256": "452e4baba239cdb369ca3e784600cb8a437aa092e7095df63ee6229c58a29b1c"
+}

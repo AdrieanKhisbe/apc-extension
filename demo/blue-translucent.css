@@ -1,0 +1,40 @@
+/* Import with apc.imports. Translucent workbench surfaces over a blue backdrop. */
+.monaco-workbench {
+  background: linear-gradient(125deg, #091c32, #24577b) !important;
+  --vscode-foreground: #cfe5f5;
+  --vscode-editor-foreground: #d3e7f7;
+  --vscode-sideBar-foreground: #bfd8ec;
+  --vscode-list-activeSelectionBackground: #4084b56b;
+  --vscode-list-inactiveSelectionBackground: #4084b54d;
+  --vscode-focusBorder: #75b9e0;
+}
+.monaco-workbench .part.editor,
+.monaco-workbench .part.sidebar {
+  background: rgb(10 31 53 / 78%) !important;
+}
+.monaco-workbench .split-view-view,
+.monaco-workbench .part > .content,
+.monaco-workbench .editor-group-container,
+.monaco-workbench .editor-container,
+.monaco-workbench .editor-instance,
+.monaco-workbench .monaco-editor,
+.monaco-workbench .monaco-editor-background,
+.monaco-workbench .monaco-editor .margin,
+.monaco-workbench .monaco-list-rows {
+  background: transparent !important;
+}
+.monaco-workbench .part.titlebar,
+.monaco-workbench .part.statusbar,
+.monaco-workbench .part.activitybar,
+.monaco-workbench .editor-group-container > .title,
+.monaco-workbench .part.sidebar > .title,
+.monaco-workbench .part.sidebar .pane-header {
+  background: rgb(42 85 120 / 48%) !important;
+  color: #cfe5f5 !important;
+}
+.monaco-workbench .tab {
+  background: rgb(10 31 53 / 36%) !important;
+}
+.monaco-workbench .tab.active {
+  background: rgb(77 133 174 / 28%) !important;
+}

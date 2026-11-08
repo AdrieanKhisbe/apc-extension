@@ -10,11 +10,18 @@ The Successor to iocave/Customize UI
 
 ## Overview
 
-This extension allows customization outside of vscode's usual scope.
+This extension allows customization outside of vscode's usual scope: CSS/JavaScript
+imports, fonts, list and bar sizing, status buttons, theme colors, native window
+options and webview styling.
 
 Unlike its predecessor, it ships with no default settings, granting you full customization control.
 
 Explore my setup for inspiration: [View Settings](https://github.com/drcika/apc-extension/blob/production/demo/settings.json)
+
+## Requirements
+
+Requires VS Code 1.140.0 or newer. See [development coverage](DEVELOPMENT.md#feature-coverage)
+for verified editor versions and platforms.
 
 ## Getting Started
 
@@ -28,7 +35,24 @@ Explore my setup for inspiration: [View Settings](https://github.com/drcika/apc-
   - Open the Command Palette (Mac: <kbd>⌘</kbd>+<kbd>Shift</kbd>+<kbd>P</kbd>, Windows: <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>P</kbd>)
   - Type `Enable Apc extension` to enable or `Disable Apc extension` to disable
 
+## Usage notes
+
+- **Reload after enabling/disabling APC**, first enabling layout hooks, adding
+  remote import origins, or removing JavaScript effects. Later UI/CSS edits update
+  live. **Restart VS Code** for native window/menu changes; **recreate webviews**
+  after webview style changes. Extensions can override these shared webview styles.
+- **Scripts run once per unchanged file per window.**
+- **Use one APC profile per installation.** Patches and import configuration are
+  shared by every window using that editor. Remote resources remain subject to
+  VS Code's CSP and are not watched.
+- **Disable restores the backed-up application files.** If APC reports a changed
+  build, damaged backup, or stale lock, follow the
+  [recovery guidance](DEVELOPMENT.md#patch-recovery).
+
 ## Troubleshooting Extension Issues
+
+Import errors appear in Developer Tools; file and patch errors also show a
+notification.
 
 ### Extension stopped functioning after an update
 
@@ -80,7 +104,10 @@ This experimental extension tweaks certain VSCode / VSCodium files. <br>
 
 ---
 
-## Supported Configuration Options
+## Configuration reference
+
+Check the [requirements](#requirements) and [reload/restart guidance](#usage-notes)
+before using these settings.
 
 ### `apc.electron`
 
@@ -167,6 +194,8 @@ Configures the Electron window. For detailed info, see the [Electron BrowserWind
 
 ### `font.family`
 
+Normal VS Code editor font settings remain separate from these workbench overrides.
+
 Customize font family for any part of VS Code
 
 <details>
@@ -198,7 +227,8 @@ Change default font family for individual sections
   "apc.parts.font.family": {
     "sidebar": "Roboto Mono",
     "titlebar": "Roboto Mono",
-    "activityBar": "Roboto Mono",
+    "auxiliarybar": "Roboto Mono",
+    "banner": "Roboto Mono",
     "panel": "Roboto Mono",
     "tabs": "Roboto Mono",
     "statusbar": "Roboto Mono",
@@ -230,6 +260,14 @@ Override the default CSS of VS Code
    	  }
     }
 ```
+
+### `apc.theme`
+
+`apc.theme` overrides only the listed global color tokens. Removing tokens or
+disabling APC restores their previous values, including across editor restarts;
+later manual edits are preserved. An absent or empty theme applies no palette.
+Colors written by earlier APC versions have no saved baseline and cannot be
+automatically recovered.
 
 ### `apc.imports`
 
@@ -362,7 +400,9 @@ Specify the height and font size of list rows
 
 ### `apc.iframe.style`
 
-Apply custom CSS to iframes (Notebook, Extension view, etc)
+Apply custom CSS to VS Code webview documents (notebook output, extension views,
+Markdown previews, etc). Embedded frame documents keep their own styles: APC
+does not recursively inject CSS or change their sandbox/CSP permissions.
 
 > [!IMPORTANT]
 > If you have an open iframe tab when starting VSCode, reopen it to apply the styles.
@@ -383,17 +423,39 @@ Apply custom CSS to iframes (Notebook, Extension view, etc)
   }
 ```
 
-## Demo
+## Screenshots
 
-<div style="text-align:center">
-  <img src="https://raw.githubusercontent.com/drcika/apc-extension/production/demo.png" alt="demo.png"/>
-</div>
+### Appearance examples
+
+Two looks for the same layout: a top status bar, bottom activity bar, custom
+fonts and taller list rows, shown on Linux.
+
+| Neutral layout | Blue translucent panels |
+| --- | --- |
+| ![Neutral APC layout with a top status bar and bottom activity bar](demo/layout.png) | ![Blue APC layout with translucent editor surfaces and blue bars](demo/blue-translucent.png) |
+| Custom fonts, row sizing and bar placement. | The same layout with the [blue stylesheet](demo/blue-translucent.css). |
+
+The blue example uses translucent CSS surfaces over a blue backdrop. Import
+[`demo/blue-translucent.css`](demo/blue-translucent.css) through `apc.imports`
+to try the palette; native window effects depend on the operating system.
+
+### Original upstream demo
+
+The original dark-blue setup, retained for inspiration. Its settings are in
+[`demo/settings.json`](demo/settings.json); this is a historical capture.
+
+![Original upstream APC demo with a dark-blue geometric background](demo.png)
 
 ## ⚠️ Important Notice
 
 This extension is your go-to tool for customizing Electron and Visual Studio Code.
 
 While I haven't developed any features or provided support for bugs, think of me as your bridge to tailor Electron and VS Code just the way you like.
+
+## Development
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for setup and pull requests, and
+[DEVELOPMENT.md](DEVELOPMENT.md) for architecture, tests and coverage.
 
 ## Inspirations
 

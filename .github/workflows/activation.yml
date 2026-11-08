@@ -1,0 +1,55 @@
+name: VS Code compatibility
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  activation:
+    name: APC / ${{ matrix.os }} / VS Code ${{ matrix.vscode }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      max-parallel: 3
+      matrix:
+        os: ['ubuntu-24.04', 'macos-15', 'windows-2022']
+        vscode: ['1.140.0', 'stable']
+    env:
+      VSCODE_VERSION: ${{ matrix.vscode }}
+      APC_THEME_TRACE: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - name: Verify APC features and restoration on Linux
+        if: runner.os == 'Linux'
+        run: xvfb-run -a npm test
+      - name: Verify APC features and restoration on macOS and Windows
+        if: runner.os != 'Linux'
+        run: npm test
+      - name: Verify native window options and background focus
+        if: runner.os != 'Linux'
+        run: node test/native-ci.js
+      - name: Upload extension host logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.os }}-vscode-${{ matrix.vscode }}-logs
+          path: |
+            .vscode-test/runs/**/logs/**
+            .vscode-test/runs/**/*.json
+            .vscode-test/native-runtime-*/result.json
+            .vscode-test/native-runtime-*/*.log
+            .vscode-test/native-runtime-*/*.err
+            .vscode-test/customizations-*.json
+            .vscode-test/customizations-*.png
+          include-hidden-files: true
+          if-no-files-found: ignore
