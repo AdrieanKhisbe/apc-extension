@@ -2,7 +2,7 @@
 
 Bug reports, fixes and improvements are welcome. For user setup and supported
 features, see [README.md](README.md). For architecture and detailed test-harness
-notes, see the [development reference](docs/development.md).
+notes, see the [development reference](DEVELOPMENT.md).
 
 ## Report a bug
 
@@ -39,9 +39,10 @@ git switch -c feature/my-change
 - Follow the existing code style and keep TypeScript strict checks passing.
 - Add a regression test for a bug fix where practical. Test observable behavior
   through settings, commands or rendered output.
-- Update README settings examples and coverage notes when behavior changes.
+- Update README settings examples and the [coverage table](DEVELOPMENT.md#feature-coverage)
+  when behavior changes.
 
-The [module map](docs/development.md#module-based-port) explains where patching,
+The [module map](DEVELOPMENT.md#module-based-port) explains where patching,
 customizations, native options and webview styling live.
 
 ## Run tests
@@ -75,8 +76,8 @@ npm test
 
 CI runs both versions on Linux, macOS and Windows, with additional native probes
 on macOS and Windows. Logs and measured results are uploaded as workflow
-artifacts. See the [test-harness reference](docs/development.md#tests) for focused
-runners and the [README coverage table](README.md#modern-vs-code-compatibility)
+artifacts. See the [test-harness reference](DEVELOPMENT.md#tests) for focused
+runners and the [coverage table](DEVELOPMENT.md#feature-coverage)
 for verified behavior and remaining gaps.
 
 ## Submit a pull request

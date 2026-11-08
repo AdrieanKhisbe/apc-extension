@@ -1,9 +1,35 @@
 # Development reference
 
-For setup and the contribution workflow, see [CONTRIBUTING.md](../CONTRIBUTING.md).
-User setup and feature availability are in [README.md](../README.md). Commands
+For setup and the contribution workflow, see [CONTRIBUTING.md](CONTRIBUTING.md).
+User setup and feature availability are in [README.md](README.md). Commands
 below run from the repository root. These notes describe the test harness,
 patching architecture and recovery behavior.
+
+## Feature coverage
+
+| Feature | Implemented | Tested | Remaining coverage |
+| --- | --- | --- | --- |
+| Activation, enable/disable, restoration | ✅ Modern lifecycle and reversible patching | ✅ Automated lifecycle and real-editor checks | — |
+| Local `.css`/`.js` imports | ✅ Absolute paths, `file://`, `${userHome}`, import objects | ✅ Publication and real-editor imports | — |
+| HTTP(S) import objects | ✅ Configured script/style origins | ✅ Real-editor loading under CSP | — |
+| `apc.stylesheet` | ✅ Live configuration updates | ✅ Real-editor changes and removal | — |
+| Live local file updates | ✅ Including atomic saves | ✅ Repeated atomic CSS saves, CSS/JS updates, deduplication and failure recovery | — |
+| `apc.buttons` | ✅ Commands, terminals and live SCM counts | ✅ Clicks, priority, terminal execution, Git counts, repository lifecycle, cleanup and re-enable | — |
+| `apc.theme` | ✅ Startup/live colors and persistent restoration | ✅ Reopening, manual-edit preservation, interrupted writes, renderer colors and disabled-state gating | — |
+| Font overrides | ✅ Global, monospace and per-part styles | ✅ All part selectors in unit tests; global/sidebar/tab/panel/status fonts and auxiliary-window tab/monospace scopes in editors | 🟡 Real-editor auxiliary-bar, titlebar, banner, menu, settings and extension-editor font rendering |
+| List row/header dimensions | ✅ Virtualized measurements, font sizes and headers | ✅ Unit delegates/special rows; real Explorer/Search/Outline/SCM sizing; Explorer/Search/Outline pointer navigation; Explorer scrolling, live updates and reset | 🟡 Real debug/custom/open-editor lists and input/action row geometry |
+| Activity/status bar layout | ✅ Measured sizing, bottom activity bar and four status positions | ✅ Positions, visibility, sidebars/panels, grid bounds, keyboard navigation, live changes and reset | 🟡 Split editor groups combined with side panels |
+| Zen / fullscreen compatibility | ✅ Custom layout follows mode visibility and restoration | ✅ Zen, native fullscreen and combined enter/exit; native events/getters, hidden bars/tabs, live placement and restored sizes | 🟡 Zen/fullscreen in auxiliary windows |
+| `apc.electron`, compact menubar | ✅ Documented window options and compact menus | ✅ macOS/Windows getters, sandbox preservation, background focus, mouse/keyboard menus and restoration | 🟡 Vibrancy, Mica, transparency and frame appearance |
+| Iframe/webview styling | ✅ Object/file CSS, watching and restoration | ✅ CSP/theme/recreation, retained panels, custom editors, sidebar views, notebook output, Markdown edits/refresh/reopen and nested-frame boundaries | 🟡 Provider serialization across restarts; remote embedded content |
+
+✅ describes implementation or checks passed for the stated scope. 🟡 appears
+only under remaining coverage; it does not downgrade the passing checks.
+
+CI runs VS Code 1.140.0 and current stable on Linux, macOS and Windows, including
+native-window/menu probes on macOS and Windows. The [recorded full verification](https://github.com/AdrieanKhisbe/apc-extension/actions/runs/42476480627)
+passed on 1.140.0 and 1.145.2 at `e3f0f47`. Unknown internal layouts are rejected
+before application files are changed.
 
 ## Tests
 
@@ -72,9 +98,9 @@ interaction and exact restoration. Windows runtime discovery also supports
 commit-versioned application directories. The terminal-button test uses
 PowerShell on Windows and `/bin/sh` elsewhere. These checks do not prove native
 compositor effects such as vibrancy or Mica. Historical macOS observations are
-in [test/evidence/native-findings.md](../test/evidence/native-findings.md).
+in [test/evidence/native-findings.md](test/evidence/native-findings.md).
 Measured layout observations are in
-[test/evidence/customizations-findings.md](../test/evidence/customizations-findings.md).
+[test/evidence/customizations-findings.md](test/evidence/customizations-findings.md).
 
 Ordinary `node --test` cannot provide the real `vscode` module. The editor runners
 use strict assertions and promise rejection through VS Code's runner contract;
@@ -111,6 +137,8 @@ The browser resources are editable source shipped verbatim. Passing them through
 the extension-host compiler would target CommonJS without DOM types. UI settings
 are also published as an internal configuration script that runs on every
 revision, including A→B→A; user scripts still execute once per unchanged file.
+Edited scripts must clean up their own listeners/observers. Reload after editing
+top-level `const`/`let` declarations in classic scripts.
 
 Webview CSS uses the application's existing trusted default stylesheet, which
 precedes an extension's CSP meta. The adapter updates the matching script-src
@@ -136,4 +164,13 @@ not every combination of private workbench internals. Remaining gaps include
 exhaustive layout and font/list combinations, provider serialization across
 editor restarts, embedded remote-content variants, and native compositor appearance
 (vibrancy, Mica, transparency and frame combinations). Keep these limits explicit
-in the README feature table.
+in the [feature coverage table](#feature-coverage).
+
+## Visual evidence
+
+The [README gallery](README.md#screenshots) shows matching neutral and blue
+translucent layouts captured in an isolated CI editor on VS Code 1.145.2/Linux.
+The screenshots demonstrate CSS surfaces; they do not establish native compositor
+effects. The reusable palette is [demo/blue-translucent.css](demo/blue-translucent.css).
+The [original upstream demo](README.md#original-upstream-demo) is a historical
+capture retained for inspiration.
