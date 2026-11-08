@@ -34,9 +34,9 @@ latest stable release; the old AMD implementation has been removed.
 | `apc.theme` | ✅ Startup/live colors and persistent restoration on removal/disable | ✅ Lifecycle, reopening, manual-edit preservation, interrupted writes, renderer colors and disabled-state gating |
 | Font overrides | ✅ Global, monospace and per-part styles | 🟡 All part selectors in unit tests; global/sidebar/tab/panel and auxiliary-window fonts in editor; remaining combinations unverified |
 | List row/header dimensions | ✅ Virtualized measurements, font sizes and tab/sidebar headers | 🟡 Default delegates and special rows in unit tests; Explorer/Search/Outline/SCM geometry, pointer selection, scrolling, live updates and reset in editor |
-| Activity/status bar layout | ✅ Measured sizing, horizontal bottom activity bar and four status positions | 🟡 Four status positions, visibility, right sidebar, left/right/bottom panels, grid bounds, navigation and reset; Zen/fullscreen combinations unverified |
+| Activity/status bar layout | ✅ Measured sizing, horizontal bottom activity bar and four status positions | 🟡 Four status positions, visibility, sidebars/panels, Zen and native fullscreen enter/exit, live placement, navigation and reset; exhaustive combinations unverified |
 | `apc.electron`, compact menubar | ✅ Documented window options and compact menus | 🟡 macOS/Windows window getters, sandbox preservation, unfocused test windows, mouse/keyboard menus and restoration; compositor effects unverified |
-| Iframe/webview styling | ✅ Object/file CSS, file watching and restoration | 🟡 Three CSP policies, theme/recreation, retained/moved panels, custom editors, sidebar views, notebook output and restoration; Markdown previews/nested frames unverified |
+| Iframe/webview styling | ✅ Object/file CSS, file watching and restoration | 🟡 CSP/theme/recreation, retained panels, custom editors, sidebar views, notebook output, Markdown edits/refresh/reopen and nested-frame boundaries; provider serialization across restarts unverified |
 
 ✅ = implemented or automated checks passed for the stated scope; 🟡 = partial
 implementation or coverage. CI runs VS Code 1.140.0 and current stable on Linux,
@@ -418,7 +418,9 @@ Specify the height and font size of list rows
 
 ### `apc.iframe.style`
 
-Apply custom CSS to iframes (Notebook, Extension view, etc)
+Apply custom CSS to VS Code webview documents (notebook output, extension views,
+Markdown previews, etc). Embedded frame documents keep their own styles: APC
+does not recursively inject CSS or change their sandbox/CSP permissions.
 
 > [!IMPORTANT]
 > If you have an open iframe tab when starting VSCode, reopen it to apply the styles.

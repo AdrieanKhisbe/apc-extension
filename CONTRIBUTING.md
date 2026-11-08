@@ -42,6 +42,11 @@ unchanged startup without application writes. `test/webview.run.js` checks
 three CSP policies and actual dark/light changes, document recreation, retained
 panels, custom text editors, sidebar views and stored notebook output across
 baseline/install/update/restoration phases in a separate fixture extension.
+`test/markdown-preview.js` reads the built-in Markdown preview through CDP and
+checks source edits, refresh, dark/light themes and reopen without changing
+preview security. `test/nested-frames.js` checks same-origin, sandboxed and
+two-level frames before/after recreation: CSS stays in the host webview,
+inherited script CSP remains enforced, and opaque children retain DOM isolation.
 
 The main harness runs the measured-layout suite first and restores its changes
 before the remaining extension-host suites. To run
@@ -49,8 +54,10 @@ that suite independently, use
 `APC_EDITOR='/path/to/disposable/editor' node test/customizations-run.js`.
 It checks fonts, row geometry, pointer/scroll behavior, header bounds, horizontal
 activity navigation, all status positions, status visibility, right sidebar,
-left/right/bottom panels, auxiliary-window tab/font scopes, live changes and reset. Never supply
-the daily editor or an editor copy currently used by another test.
+left/right/bottom panels, auxiliary-window tab/font scopes, live changes and reset.
+`test/mode-layouts.js` enters/exits actual Zen and native fullscreen, including
+Zen-triggered fullscreen and live status placement, then checks restored sizes.
+Never supply the daily editor or an editor copy currently used by another test.
 
 The macOS/Windows native-window/menu runner is separate. Use
 `node test/native-ci.js` to select the cached/downloaded version, or
@@ -93,6 +100,9 @@ It snapshots every affected file, records build identity/checksums, publishes
 dependencies before startup entry points, and rolls back failed batches. The
 bounded file batch stays synchronous while holding the cross-process lock;
 an asynchronous rewrite would also need a serialized refresh/disposal queue.
+Atomic replacements retry native sharing errors for at most 775 ms per file.
+Rollback skips destinations whose original bytes never changed, so a locked
+untouched file cannot turn a failed installation into a failed rollback.
 
 The browser resources are editable source shipped verbatim. Passing them through
 the extension-host compiler would target CommonJS without DOM types. UI settings
@@ -120,7 +130,7 @@ and removes generated sidecars; reload/restart afterward to unload running code.
 
 The matrix establishes the stated behavior on VS Code 1.140.0 and current stable,
 not every combination of private workbench internals. Remaining gaps include
-Zen/fullscreen modes, every font/list combination, provider serialization across
-editor restarts, Markdown previews/nested frames, and native compositor appearance
+exhaustive layout and font/list combinations, provider serialization across
+editor restarts, embedded remote-content variants, and native compositor appearance
 (vibrancy, Mica, transparency and frame combinations). Keep these limits explicit
 in the README feature table.

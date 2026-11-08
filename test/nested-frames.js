@@ -28,7 +28,7 @@ exports.run = async function (expected) {
   async function inspect(generation) {
     return eventually(() => {
       const latest = Object.fromEntries(messages.filter(value => value.generation === generation).map(value => [value.kind, value]));
-      if (!['parent', 'same-origin', 'opaque', 'grandchild'].every(kind => latest[kind])) { return false; }
+      assert.ok(['parent', 'same-origin', 'opaque', 'grandchild'].every(kind => latest[kind]), 'Waiting for all frame reports: ' + JSON.stringify(latest));
       assert.equal(latest.parent.marker, expected, 'APC CSS must reach the hosting webview');
       assert.equal(latest.parent.topReadable, false, 'The parent webview must remain isolated from the workbench');
       for (const kind of ['same-origin', 'opaque', 'grandchild']) {
