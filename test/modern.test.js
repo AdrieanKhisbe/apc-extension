@@ -24,11 +24,18 @@ function fixture(t) {
     window: { showInformationMessage: message => { notifications.push(message); return Promise.resolve(); }, showErrorMessage: message => { errors.push(message); } },
   };
   let fault; let faultCode; let faultRemaining = 1;
+  let renameFault; let renameAttempts = 0;
   const watchCallbacks = [];
   const activeWatches = new Map();
   const errors = [];
   const controlledFs = new Proxy(fs, {
     get(target, key) {
+      if (key === 'renameSync') {
+        return (from, to) => {
+          if (renameFault?.(from, to, ++renameAttempts)) { const error = new Error('injected sharing lock'); error.code = 'EPERM'; throw error; }
+          return target.renameSync(from, to);
+        };
+      }
       if (key === 'watch') {
         // Deliver controlled events here; real filesystem watching is covered
         // by the workbench integration test's atomic CSS save.
@@ -58,6 +65,7 @@ function fixture(t) {
     root, base, config, modern, notifications, errors,
     context: { extensionPath: path.resolve(__dirname, '..') },
     failWrite: (predicate, code, times = 1) => { fault = predicate; faultCode = code; faultRemaining = times; },
+    failRename: predicate => { renameFault = predicate; renameAttempts = 0; },
     fileChanged: file => { for (const [callback, directory] of [...activeWatches]) { if (directory === path.dirname(file)) { callback('change', path.basename(file)); } } },
     watchCallbacks,
     currentHtml: () => fs.readFileSync(path.join(base, 'workbench.html'), 'utf8'),
@@ -383,4 +391,28 @@ test('unchanged startup does not rewrite application files and resumes watching'
   f.failWrite(() => false);
   fs.writeFileSync(css, 'body { color: blue; }'); f.fileChanged(css);
   await eventually(() => f.publication().entries[0].text === 'body { color: blue; }', 'Reopened editor must resume file watching');
+});
+
+test('a briefly locked application file can be replaced without losing installation', t => {
+  const f = fixture(t); const webview = webviewFixture(f); let blocked = 0;
+  f.config.set('apc.iframe.style', { body: { color: 'red' } });
+  f.failRename((_from, to) => to === webview.file && ++blocked <= 2);
+  assert.doesNotThrow(() => f.modern.install(f.context));
+  assert.match(fs.readFileSync(webview.file, 'utf8'), /color: red/);
+  f.failRename(() => false);
+  f.modern.uninstallPatch();
+  assert.equal(fs.readFileSync(webview.file, 'utf8'), webview.original);
+});
+
+test('a persistently locked unchanged file does not break rollback or leave an unrecognized installation', t => {
+  const f = fixture(t); const webview = webviewFixture(f); let blocked = 0;
+  f.config.set('apc.iframe.style', { body: { color: 'red' } });
+  f.failRename((_from, to) => to === webview.file && ++blocked > 0);
+  assert.throws(() => f.modern.install(f.context), error => error.code === 'EPERM' && !error.message.includes('rollback also failed'));
+  assert.ok(blocked > 1 && blocked <= 6, 'Replacement retries must be bounded');
+  assert.equal(fs.readFileSync(webview.file, 'utf8'), webview.original);
+  assert.equal(f.currentHtml(), html);
+  assert.ok(!fs.existsSync(path.join(f.base, 'apc-extension')), 'A failed first install must not leave an unrecognized patch directory');
+  f.failRename(() => false);
+  assert.doesNotThrow(() => f.modern.install(f.context), 'The next explicit enable must remain usable');
 });

@@ -201,7 +201,15 @@ function writeAtomic(file: string, data: string | Buffer) {
   const temporary = file + `.apc-tmp-${randomBytes(8).toString('hex')}`;
   try {
     fs.writeFileSync(temporary, data, { flag: 'wx', mode: fs.existsSync(file) ? fs.statSync(file).mode : 0o644 });
-    fs.renameSync(temporary, file);
+    for (let attempt = 0; ; attempt++) {
+      try { fs.renameSync(temporary, file); break; }
+      catch (error) {
+        if (attempt >= 5 || !['EPERM', 'EACCES', 'EBUSY'].includes((error as NodeJS.ErrnoException).code || '')) { throw error; }
+        // Windows may still be reading a loaded bundle. Keep the locked batch
+        // synchronous and bounded, while allowing that other process to finish.
+        Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 25 * 2 ** attempt);
+      }
+    }
   } finally {
     if (fs.existsSync(temporary)) { fs.unlinkSync(temporary); }
   }
@@ -233,7 +241,11 @@ function transaction(layout: Layout, changes: Map<string, string | undefined>) {
     const failures: unknown[] = [];
     for (const [file, content] of [...before].reverse()) {
       try {
-        if (content !== undefined) { writeAtomic(file, content); }
+        // A rename that failed did not change its destination. Do not turn the
+        // original sharing error into a rollback failure by rewriting it again.
+        if (content !== undefined) {
+          if (!fs.existsSync(file) || !fs.readFileSync(file).equals(content)) { writeAtomic(file, content); }
+        }
         else if (fs.existsSync(file)) { fs.unlinkSync(file); }
       } catch (restoreError) { failures.push(restoreError); }
     }
