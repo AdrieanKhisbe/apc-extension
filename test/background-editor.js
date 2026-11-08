@@ -14,14 +14,22 @@ BrowserWindow.prototype.focus = () => {};
 app.on('browser-window-created', (_event, window) => {
   if (process.env?.APC_NATIVE_MODE_RESULTS) {
     const events = [];
+    let previous;
     const record = event => {
       const state = { event, fullscreen:window.isFullScreen() || window.isSimpleFullScreen(), nativeFullscreen:window.isFullScreen(), focused:window.isFocused() };
+      if (event === 'sample' && state.fullscreen === previous) { return; }
+      previous = state.fullscreen;
       events.push({ ...state, time:Date.now() });
       fs.writeFileSync(process.env.APC_NATIVE_MODE_RESULTS, JSON.stringify({ ...state, events }));
     };
     record('created');
     window.on('enter-full-screen', () => record('entered'));
     window.on('leave-full-screen', () => record('left'));
+    // Some Electron builds deliver the event before their getter changes.
+    // Keep observing actual state instead of freezing the event-time value.
+    const timer = setInterval(() => { if (!window.isDestroyed()) { record('sample'); } }, 50);
+    timer.unref();
+    window.once('closed', () => clearInterval(timer));
   }
   if (preventFocus) {
     const setFocusable = window.setFocusable.bind(window);

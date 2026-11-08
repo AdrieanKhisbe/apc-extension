@@ -69,3 +69,26 @@ test('guarded constructors start hidden and nonfocusable without changing securi
     });
   } finally { fs.rmSync(root, { recursive: true, force: true }); }
 });
+
+test('native fullscreen evidence observes getters that settle after the event', async () => {
+  const { eventually } = require('./cdp');
+  const observed = []; const events = new Map(); let created; let fullscreen = false;
+  class BrowserWindow {
+    constructor() { this.webContents = { once() {} }; }
+    showInactive() {} focus() {} isDestroyed() { return false; }
+    isFullScreen() { return fullscreen; } isSimpleFullScreen() { return false; } isFocused() { return false; }
+    on(event, listener) { events.set(event, listener); } once(event, listener) { events.set(event, listener); }
+  }
+  const app = { on(_event, listener) { created = listener; } };
+  vm.runInNewContext(source.replace(/^import .*?;\n/gm, ''), {
+    electron: { app, BrowserWindow }, process: { platform: 'linux', env: { APC_NATIVE_MODE_RESULTS: '/unused-test-observation' } },
+    fs: { writeFileSync(_file, json) { observed.push(JSON.parse(json)); } }, setInterval, clearInterval,
+  });
+  try {
+    created(null, new BrowserWindow());
+    events.get('enter-full-screen')();
+    fullscreen = true; // Electron's getter changes after delivering the event.
+    await eventually(() => observed.at(-1)?.fullscreen === true, 'Native evidence must observe the settled getter', 1000);
+    assert.ok(observed.at(-1).events.some(event => event.event === 'entered'));
+  } finally { events.get('closed')?.(); }
+});
