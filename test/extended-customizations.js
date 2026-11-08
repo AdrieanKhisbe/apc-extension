@@ -100,6 +100,7 @@ let style=document.getElementById('apc-extended-styles');if(!style){style=docume
       await vscode.commands.executeCommand('workbench.action.positionPanelBottom');
       await vscode.commands.executeCommand('workbench.action.moveSideBarLeft');
     }
+    reports.modes = await require('./mode-layouts').run(cdp, configure);
     await configure({ header: { height: 42 }, 'font.family': 'Georgia', 'monospace.font.family': 'monospace', 'parts.font.family': { tabs: 'monospace' } });
     await vscode.window.showTextDocument(vscode.Uri.joinPath(workspace, 'outline-fixture.js'));
     const endpoint = `http://127.0.0.1:${process.env.APC_CDP_PORT}/json/list`;
