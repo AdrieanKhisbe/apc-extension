@@ -10,30 +10,18 @@ The Successor to iocave/Customize UI
 
 ## Overview
 
-This extension allows customization outside of vscode's usual scope.
+This extension allows customization outside of vscode's usual scope: CSS/JavaScript
+imports, fonts, list and bar sizing, status buttons, theme colors, native window
+options and webview styling.
 
 Unlike its predecessor, it ships with no default settings, granting you full customization control.
 
 Explore my setup for inspiration: [View Settings](https://github.com/drcika/apc-extension/blob/production/demo/settings.json)
 
-## Compatibility
+## Requirements
 
-Requires VS Code 1.140.0 or newer. APC supports CSS/JavaScript imports, fonts,
-list and bar sizing, status buttons, theme colors, native window options and
-webview styling. See [development coverage](DEVELOPMENT.md#feature-coverage)
+Requires VS Code 1.140.0 or newer. See [development coverage](DEVELOPMENT.md#feature-coverage)
 for verified editor versions, platforms and remaining gaps.
-
-- **Reload after enabling/disabling APC**, first enabling layout hooks, adding
-  remote import origins, or removing JavaScript effects. Later UI/CSS edits update
-  live. **Restart VS Code** for native window/menu changes; **recreate webviews**
-  after webview style changes. Extensions can override these shared webview styles.
-- **Scripts run once per unchanged file per window.**
-- **Use one APC profile per installation.** Patches and import configuration are
-  shared by every window using that editor. Remote resources remain subject to
-  VS Code's CSP and are not watched.
-- **Disable restores the backed-up application files.** If APC reports a changed
-  build, damaged backup, or stale lock, follow the
-  [recovery guidance](DEVELOPMENT.md#patch-recovery).
 
 ## Getting Started
 
@@ -46,6 +34,20 @@ for verified editor versions, platforms and remaining gaps.
 
   - Open the Command Palette (Mac: <kbd>⌘</kbd>+<kbd>Shift</kbd>+<kbd>P</kbd>, Windows: <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>P</kbd>)
   - Type `Enable Apc extension` to enable or `Disable Apc extension` to disable
+
+## Usage notes
+
+- **Reload after enabling/disabling APC**, first enabling layout hooks, adding
+  remote import origins, or removing JavaScript effects. Later UI/CSS edits update
+  live. **Restart VS Code** for native window/menu changes; **recreate webviews**
+  after webview style changes. Extensions can override these shared webview styles.
+- **Scripts run once per unchanged file per window.**
+- **Use one APC profile per installation.** Patches and import configuration are
+  shared by every window using that editor. Remote resources remain subject to
+  VS Code's CSP and are not watched.
+- **Disable restores the backed-up application files.** If APC reports a changed
+  build, damaged backup, or stale lock, follow the
+  [recovery guidance](DEVELOPMENT.md#patch-recovery).
 
 ## Troubleshooting Extension Issues
 
@@ -104,8 +106,8 @@ This experimental extension tweaks certain VSCode / VSCodium files. <br>
 
 ## Configuration reference
 
-Check the [compatibility and reload requirements](#compatibility) before using
-these settings.
+Check the [requirements](#requirements) and [reload/restart guidance](#usage-notes)
+before using these settings.
 
 ### `apc.electron`
 
