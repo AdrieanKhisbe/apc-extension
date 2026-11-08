@@ -14,11 +14,16 @@ exports.run = async function (cdp, configure) {
     return {fullscreen:document.querySelector('.monaco-workbench').classList.contains('fullscreen'),editor:box('.part.editor'),sidebar:box('.part.sidebar'),activity:box('.part.activitybar'),status:box('.part.statusbar'),tabs:box('.editor-group-container .tabs-container')};
   })()`), native: JSON.parse(fs.readFileSync(process.env.APC_NATIVE_MODE_RESULTS, 'utf8')) });
   const reports = {};
+  function nativeSettled(s, fullscreen) {
+    assert.equal(s.native.fullscreen, fullscreen, 'Wait for the native fullscreen getter: ' + JSON.stringify(s.native));
+    const last = s.native.events.filter(event => event.event === 'entered' || event.event === 'left').at(-1);
+    assert.equal(last?.event, fullscreen ? 'entered' : 'left', 'Wait for the matching completed native transition: ' + JSON.stringify(s.native));
+  }
   async function placed(fullscreen, top = false) {
     return eventually(async () => {
       const s = await snapshot();
       assert.equal(s.fullscreen, fullscreen, 'Native fullscreen transition must reach the workbench');
-      assert.equal(s.native.fullscreen, fullscreen, 'Wait for Electron enter/leave events before the next transition: ' + JSON.stringify(s.native));
+      nativeSettled(s, fullscreen);
       assert.ok(s.editor.width > 500 && s.editor.height > 300, 'Mode transition must preserve usable editor bounds: ' + JSON.stringify(s));
       assert.ok(s.activity.visible && s.activity.gridWidth > 1000);
       assert.equal(s.activity.gridHeight, 56);
@@ -73,7 +78,7 @@ exports.run = async function (cdp, configure) {
     reports.zenFullscreen = await eventually(async () => {
       const s = await snapshot();
       assert.equal(s.fullscreen, true, 'Zen mode must enter native fullscreen when requested');
-      assert.equal(s.native.fullscreen, true, 'Zen fullscreen must complete its native transition');
+      nativeSettled(s, true);
       assert.ok(!s.sidebar.visible && !s.activity.visible && !s.status.visible, 'Fullscreen Zen mode must hide all configured bars: ' + JSON.stringify(s));
       assert.ok(!s.tabs.visible || s.tabs.height === 0);
       assert.ok(s.editor.width > 500 && s.editor.height > 300);
