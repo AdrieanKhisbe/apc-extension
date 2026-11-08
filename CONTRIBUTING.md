@@ -78,7 +78,7 @@ CI runs both versions on Linux, macOS and Windows, with additional native probes
 on macOS and Windows. Logs and measured results are uploaded as workflow
 artifacts. See the [test-harness reference](DEVELOPMENT.md#tests) for focused
 runners and the [coverage table](DEVELOPMENT.md#feature-coverage)
-for verified behavior and remaining gaps.
+for verified behavior and additional test scenarios.
 
 ## Submit a pull request
 

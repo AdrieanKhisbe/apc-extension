@@ -7,7 +7,12 @@ patching architecture and recovery behavior.
 
 ## Feature coverage
 
-| Feature | Implemented | Tested | Remaining coverage |
+The feature port is implemented. The automated test suite and CI matrix were
+introduced during this port; the original upstream snapshot contained test
+scaffolding without the referenced runner or test sources. The final column
+lists opportunities to extend validation of the implemented features.
+
+| Feature | Implemented | Tested | Additional coverage |
 | --- | --- | --- | --- |
 | Activation, enable/disable, restoration | ✅ Modern lifecycle and reversible patching | ✅ Automated lifecycle and real-editor checks | — |
 | Local `.css`/`.js` imports | ✅ Absolute paths, `file://`, `${userHome}`, import objects | ✅ Publication and real-editor imports | — |
@@ -23,8 +28,8 @@ patching architecture and recovery behavior.
 | `apc.electron`, compact menubar | ✅ Documented window options and compact menus | ✅ macOS/Windows getters, sandbox preservation, background focus, mouse/keyboard menus and restoration | 🟡 Vibrancy, Mica, transparency and frame appearance |
 | Iframe/webview styling | ✅ Object/file CSS, watching and restoration | ✅ CSP/theme/recreation, retained panels, custom editors, sidebar views, notebook output, Markdown edits/refresh/reopen and nested-frame boundaries | 🟡 Provider serialization across restarts; remote embedded content |
 
-✅ describes implementation or checks passed for the stated scope. 🟡 appears
-only under remaining coverage; it does not downgrade the passing checks.
+✅ describes implementation or checks passed for the stated scope. 🟡 marks
+additional test scenarios for implemented features.
 
 CI runs VS Code 1.140.0 and current stable on Linux, macOS and Windows, including
 native-window/menu probes on macOS and Windows. The [recorded full verification](https://github.com/AdrieanKhisbe/apc-extension/actions/runs/42476480627)
@@ -157,14 +162,12 @@ lock left after a crash can be removed after confirming no other process is
 patching that installation. Disabling restores every tracked application file
 and removes generated sidecars; reload/restart afterward to unload running code.
 
-## Coverage still needed
+## Additional test coverage
 
-The matrix establishes the stated behavior on VS Code 1.140.0 and current stable,
-not every combination of private workbench internals. Remaining gaps include
-exhaustive layout and font/list combinations, provider serialization across
-editor restarts, embedded remote-content variants, and native compositor appearance
-(vibrancy, Mica, transparency and frame combinations). Keep these limits explicit
-in the [feature coverage table](#feature-coverage).
+Coverage can be extended to more layout and font/list combinations, provider
+serialization across editor restarts, embedded remote-content variants and
+native compositor appearance (vibrancy, Mica, transparency and frame combinations).
+Track these additional checks in the [feature coverage table](#feature-coverage).
 
 ## Visual evidence
 

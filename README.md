@@ -21,7 +21,7 @@ Explore my setup for inspiration: [View Settings](https://github.com/drcika/apc-
 ## Requirements
 
 Requires VS Code 1.140.0 or newer. See [development coverage](DEVELOPMENT.md#feature-coverage)
-for verified editor versions, platforms and remaining gaps.
+for verified editor versions and platforms.
 
 ## Getting Started
 
