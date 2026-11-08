@@ -1,4 +1,5 @@
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
 const vscode = require('vscode');
 const { eventually } = require('./cdp');
 
@@ -8,15 +9,16 @@ exports.run = async function (cdp, configure) {
   const keys = ['zenMode.fullScreen', 'zenMode.centerLayout', 'zenMode.hideActivityBar', 'zenMode.hideStatusBar', 'zenMode.showTabs'];
   const original = new Map(keys.map(key => [key, settings.inspect(key)?.globalValue]));
   let inZen = false;
-  const snapshot = () => cdp.evaluate(`(() => {
+  const snapshot = async () => ({ ...await cdp.evaluate(`(() => {
     const box=selector=>{const node=document.querySelector(selector);if(!node)return {visible:false,width:0,height:0};const r=node.getBoundingClientRect();const grid=node.parentElement.getBoundingClientRect();return {x:r.x,y:r.y,width:r.width,height:r.height,right:r.right,bottom:r.bottom,visible:node.checkVisibility()&&grid.width>0&&grid.height>0,gridWidth:grid.width,gridHeight:grid.height};};
     return {fullscreen:document.querySelector('.monaco-workbench').classList.contains('fullscreen'),editor:box('.part.editor'),sidebar:box('.part.sidebar'),activity:box('.part.activitybar'),status:box('.part.statusbar'),tabs:box('.editor-group-container .tabs-container')};
-  })()`);
+  })()`), native: JSON.parse(fs.readFileSync(process.env.APC_NATIVE_MODE_RESULTS, 'utf8')) });
   const reports = {};
   async function placed(fullscreen, top = false) {
     return eventually(async () => {
       const s = await snapshot();
       assert.equal(s.fullscreen, fullscreen, 'Native fullscreen transition must reach the workbench');
+      assert.equal(s.native.fullscreen, fullscreen, 'Wait for Electron enter/leave events before the next transition: ' + JSON.stringify(s.native));
       assert.ok(s.editor.width > 500 && s.editor.height > 300, 'Mode transition must preserve usable editor bounds: ' + JSON.stringify(s));
       assert.ok(s.activity.visible && s.activity.gridWidth > 1000);
       assert.equal(s.activity.gridHeight, 56);
@@ -71,7 +73,8 @@ exports.run = async function (cdp, configure) {
     reports.zenFullscreen = await eventually(async () => {
       const s = await snapshot();
       assert.equal(s.fullscreen, true, 'Zen mode must enter native fullscreen when requested');
-      assert.ok(!s.sidebar.visible && !s.activity.visible && !s.status.visible, 'Fullscreen Zen mode must hide all configured bars');
+      assert.equal(s.native.fullscreen, true, 'Zen fullscreen must complete its native transition');
+      assert.ok(!s.sidebar.visible && !s.activity.visible && !s.status.visible, 'Fullscreen Zen mode must hide all configured bars: ' + JSON.stringify(s));
       assert.ok(!s.tabs.visible || s.tabs.height === 0);
       assert.ok(s.editor.width > 500 && s.editor.height > 300);
       return s;
@@ -81,10 +84,13 @@ exports.run = async function (cdp, configure) {
     console.log('PASS: fullscreen Zen mode exits to the original measured grid.');
     return reports;
   } finally {
-    if (inZen) { await vscode.commands.executeCommand('workbench.action.toggleZenMode'); }
+    if (inZen) {
+      await vscode.commands.executeCommand('workbench.action.toggleZenMode');
+      await eventually(async () => { const s = await snapshot(); return !s.fullscreen && !s.native.fullscreen; }, 'Zen cleanup must finish leaving native fullscreen', 30000);
+    }
     if ((await snapshot()).fullscreen) {
       await vscode.commands.executeCommand('workbench.action.toggleFullScreen');
-      await eventually(async () => !(await snapshot()).fullscreen, 'Cleanup must leave fullscreen', 30000);
+      await eventually(async () => { const s = await snapshot(); return !s.fullscreen && !s.native.fullscreen; }, 'Cleanup must leave fullscreen', 30000);
     }
     for (const [key, value] of original) { await settings.update(key, value, vscode.ConfigurationTarget.Global); }
   }

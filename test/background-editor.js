@@ -4,6 +4,7 @@ const path = require('node:path');
 const assert = require('node:assert/strict');
 const prefix = 'import "./apc-test-background.mjs";\n';
 const source = `import electron from 'electron';
+import fs from 'node:fs';
 const { app, BrowserWindow } = electron;
 const preventFocus = process.platform === 'darwin' || process.platform === 'win32';
 if (process.platform === 'darwin') { app.setActivationPolicy('accessory'); }
@@ -11,6 +12,17 @@ app.focus = () => {};
 BrowserWindow.prototype.show = BrowserWindow.prototype.showInactive;
 BrowserWindow.prototype.focus = () => {};
 app.on('browser-window-created', (_event, window) => {
+  if (process.env?.APC_NATIVE_MODE_RESULTS) {
+    const events = [];
+    const record = event => {
+      const state = { event, fullscreen:window.isFullScreen() || window.isSimpleFullScreen(), nativeFullscreen:window.isFullScreen(), focused:window.isFocused() };
+      events.push({ ...state, time:Date.now() });
+      fs.writeFileSync(process.env.APC_NATIVE_MODE_RESULTS, JSON.stringify({ ...state, events }));
+    };
+    record('created');
+    window.on('enter-full-screen', () => record('entered'));
+    window.on('leave-full-screen', () => record('left'));
+  }
   if (preventFocus) {
     const setFocusable = window.setFocusable.bind(window);
     window.setFocusable = () => setFocusable(false);

@@ -19,7 +19,7 @@ for (const platform of ['linux', 'darwin', 'win32']) {
     }
     const app = { focus() { focused++; }, setActivationPolicy: value => { policy = value; }, on: (event, fn) => { assert.equal(event, 'browser-window-created'); created = fn; } };
     const electron = { app, BrowserWindow };
-    vm.runInNewContext(source.replace(/^import .*?;\n/, ''), { app, BrowserWindow, electron, process: { platform } });
+    vm.runInNewContext(source.replace(/^import .*?;\n/gm, ''), { app, BrowserWindow, electron, fs, process: { platform } });
     const preferences = { sandbox: true };
     const window = new electron.BrowserWindow({ show: true, focusable: true, webPreferences: preferences });
     assert.equal(window.options.webPreferences, preferences, 'The guard must preserve native security preferences');
