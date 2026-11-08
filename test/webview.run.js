@@ -47,7 +47,7 @@ async function main() {
     fs.writeFileSync(template, original);
     const logs = path.join(profile, 'user-data/logs');
     if (fs.existsSync(logs)) { fs.cpSync(logs, path.join(output, 'logs'), { recursive: true }); }
-    fs.rmSync(profile, { recursive: true, force: true });
+    fs.rmSync(profile, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
   }
   });
 }

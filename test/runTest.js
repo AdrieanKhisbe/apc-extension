@@ -146,7 +146,7 @@ async function main() {
     if (fs.existsSync(logs)) {
       fs.cpSync(logs, path.join(run, 'logs'), { recursive: true });
     }
-    fs.rmSync(profile, { recursive: true, force: true });
+    fs.rmSync(profile, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
     await new Promise(resolve => external.close(resolve));
     console.log(`Editor logs: ${run}`);
   }
