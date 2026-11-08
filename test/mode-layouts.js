@@ -13,6 +13,20 @@ exports.run = async function (cdp, configure) {
     return {fullscreen:document.querySelector('.monaco-workbench').classList.contains('fullscreen'),editor:box('.part.editor'),sidebar:box('.part.sidebar'),activity:box('.part.activitybar'),status:box('.part.statusbar'),tabs:box('.editor-group-container .tabs-container')};
   })()`);
   const reports = {};
+  async function placed(fullscreen, top = false) {
+    return eventually(async () => {
+      const s = await snapshot();
+      assert.equal(s.fullscreen, fullscreen, 'Native fullscreen transition must reach the workbench');
+      assert.ok(s.editor.width > 500 && s.editor.height > 300, 'Mode transition must preserve usable editor bounds: ' + JSON.stringify(s));
+      assert.ok(s.activity.visible && s.activity.gridWidth > 1000);
+      assert.equal(s.activity.gridHeight, 56);
+      assert.equal(s.status.height, 32);
+      assert.equal(s.tabs.height, 42);
+      if (top) { assert.equal(s.status.y, 0, 'Global status bar must stay at the top in fullscreen'); }
+      else { assert.ok(s.status.y >= s.editor.bottom - 1 && s.status.bottom <= s.activity.y + 1, 'Editor-relative status must keep its reserved row: ' + JSON.stringify(s)); }
+      return s;
+    }, `Custom grid must survive ${fullscreen ? 'entering' : 'leaving'} fullscreen`, 30000);
+  }
   try {
     for (const [key, value] of Object.entries({ 'zenMode.fullScreen': false, 'zenMode.centerLayout': true, 'zenMode.hideActivityBar': true, 'zenMode.hideStatusBar': true, 'zenMode.showTabs': 'none' })) {
       await settings.update(key, value, vscode.ConfigurationTarget.Global);
@@ -43,9 +57,35 @@ exports.run = async function (cdp, configure) {
       return s;
     }, 'Leaving Zen mode must restore APC sizes and placement');
     console.log('PASS: real Zen mode hides custom bars/tabs and restores measured layout.');
+    await vscode.commands.executeCommand('workbench.action.toggleFullScreen');
+    reports.fullscreen = await placed(true);
+    await configure({ activityBar: { size: 56, position: 'bottom' }, statusBar: { height: 32, position: 'top' }, header: { height: 42 } });
+    reports.fullscreenUpdated = await placed(true, true);
+    await vscode.commands.executeCommand('workbench.action.toggleFullScreen');
+    reports.fullscreenRestored = await placed(false, true);
+    console.log('PASS: native fullscreen enter/exit retains custom sizes and live status placement.');
+
+    await configure({ activityBar: { size: 56, position: 'bottom' }, statusBar: { height: 32, position: 'editor-bottom' }, header: { height: 42 } });
+    await settings.update('zenMode.fullScreen', true, vscode.ConfigurationTarget.Global);
+    await vscode.commands.executeCommand('workbench.action.toggleZenMode'); inZen = true;
+    reports.zenFullscreen = await eventually(async () => {
+      const s = await snapshot();
+      assert.equal(s.fullscreen, true, 'Zen mode must enter native fullscreen when requested');
+      assert.ok(!s.sidebar.visible && !s.activity.visible && !s.status.visible, 'Fullscreen Zen mode must hide all configured bars');
+      assert.ok(!s.tabs.visible || s.tabs.height === 0);
+      assert.ok(s.editor.width > 500 && s.editor.height > 300);
+      return s;
+    }, 'Zen mode must combine hidden parts with native fullscreen', 30000);
+    await vscode.commands.executeCommand('workbench.action.toggleZenMode'); inZen = false;
+    reports.zenFullscreenRestored = await placed(false);
+    console.log('PASS: fullscreen Zen mode exits to the original measured grid.');
     return reports;
   } finally {
     if (inZen) { await vscode.commands.executeCommand('workbench.action.toggleZenMode'); }
+    if ((await snapshot()).fullscreen) {
+      await vscode.commands.executeCommand('workbench.action.toggleFullScreen');
+      await eventually(async () => !(await snapshot()).fullscreen, 'Cleanup must leave fullscreen', 30000);
+    }
     for (const [key, value] of original) { await settings.update(key, value, vscode.ConfigurationTarget.Global); }
   }
 };
