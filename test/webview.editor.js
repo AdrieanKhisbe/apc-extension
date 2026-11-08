@@ -44,6 +44,7 @@ exports.run = async () => {
     } finally { listener.dispose(); panel.dispose(); }
   }
   const lifecycles = await require('./webview-lifecycles').run(expected);
+  const markdown = await require('./markdown-preview').run(expected);
   const publish = () => {
     const changes = prepareWebview({}, originals);
     for (const [target, text] of changes) { fs.writeFileSync(target, text); }
@@ -64,6 +65,6 @@ exports.run = async () => {
     await settings.update('apc.iframe.style', undefined, vscode.ConfigurationTarget.Global);
     publish(); assert.equal(fs.readFileSync(file, 'utf8'), original);
   } else { assert.equal(fs.readFileSync(file, 'utf8'), original); }
-  fs.writeFileSync(process.env.APC_WEBVIEW_OUTPUT, JSON.stringify({ phase, vscode: vscode.version, platform: process.platform, arch: process.arch, reports, lifecycles }, null, 2));
+  fs.writeFileSync(process.env.APC_WEBVIEW_OUTPUT, JSON.stringify({ phase, vscode: vscode.version, platform: process.platform, arch: process.arch, reports, lifecycles, markdown }, null, 2));
   console.log(`PASS: real webview policies, theme, recreation and ${phase} lifecycle`);
 };

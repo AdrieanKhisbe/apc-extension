@@ -5,6 +5,7 @@ const { withBackgroundEditor } = require('./background-editor');
 const fs = require('node:fs');
 const path = require('node:path');
 const os = require('node:os');
+const net = require('node:net');
 const assert = require('node:assert/strict');
 const { downloadAndUnzipVSCode, runTests } = require('@vscode/test-electron');
 
@@ -26,15 +27,19 @@ async function main() {
     contributes: { notebooks: [{ type: 'apc-tests.notebook', displayName: 'APC lifecycle notebook', selector: [{ filenamePattern: '*.apcnb' }] }], notebookRenderer: [{ id: 'apc-tests.notebook-renderer', displayName: 'APC lifecycle renderer', entrypoint: './notebook-renderer.mjs', mimeTypes: ['application/x.apc-fixture'], requiresMessaging: 'always' }], customEditors: [{ viewType: 'apc-tests.custom', displayName: 'APC lifecycle editor', selector: [{ filenamePattern: '*.apcfixture' }], priority: 'option' }], views: { explorer: [{ id: 'apc-tests.view', name: 'APC lifecycle view', type: 'webview' }] }, configuration: { properties: { 'apc.iframe.style': { type: ['object', 'string'] } } } } }));
   fs.writeFileSync(path.join(driver, 'extension.cjs'), 'exports.activate = () => {};\n');
   // VS Code scopes renderer messaging to the extension owning the caller file.
-  for (const file of ['notebook-renderer.mjs', 'webview.editor.js', 'webview-lifecycles.js', 'cdp.js']) {
+  for (const file of ['notebook-renderer.mjs', 'webview.editor.js', 'webview-lifecycles.js', 'markdown-preview.js', 'cdp.js']) {
     fs.copyFileSync(path.join(__dirname, file), path.join(driver, file));
   }
   try {
     for (const phase of ['baseline', 'installed', 'file-updated', 'restored']) {
+      const server = net.createServer();
+      await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+      const port = server.address().port;
+      await new Promise(resolve => server.close(resolve));
       await runTests({ vscodeExecutablePath: executable, extensionDevelopmentPath: driver,
         extensionTestsPath: path.join(driver, 'webview.editor.js'),
-        extensionTestsEnv: { APC_SOURCE_ROOT: root, APC_WEBVIEW_PHASE: phase, APC_WEBVIEW_OUTPUT: path.join(output, phase + '.json'), APC_WEBVIEW_ORIGINAL: backup, APC_WEBVIEW_STYLE: path.join(profile, 'style.css') },
-        launchArgs: [`--user-data-dir=${profile}/user-data`, `--extensions-dir=${profile}/extensions`, '--disable-extensions', '--disable-gpu', '--skip-welcome', '--skip-release-notes', '--disable-updates'] });
+        extensionTestsEnv: { APC_CDP_PORT: String(port), APC_SOURCE_ROOT: root, APC_WEBVIEW_PHASE: phase, APC_WEBVIEW_OUTPUT: path.join(output, phase + '.json'), APC_WEBVIEW_ORIGINAL: backup, APC_WEBVIEW_STYLE: path.join(profile, 'style.css') },
+        launchArgs: [`--remote-debugging-port=${port}`, `--user-data-dir=${profile}/user-data`, `--extensions-dir=${profile}/extensions`, '--disable-extensions', '--disable-gpu', '--skip-welcome', '--skip-release-notes', '--disable-updates'] });
     }
     assert.deepEqual(fs.readFileSync(template), original, 'Removing webview configuration must restore exact template bytes');
     console.log(`PASS: webview lifecycle, three CSP policies and exact restoration on VS Code ${version}`);

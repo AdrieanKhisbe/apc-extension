@@ -33,12 +33,12 @@ async function connect(port, select = item => item.type === 'page' && item.url.i
       callback(response);
     }
   });
-  async function send(method, params) {
+  async function send(method, params, sessionId) {
     const requestId = ++id;
     const response = await new Promise((resolve, reject) => {
       const timer = setTimeout(() => { pending.delete(requestId); reject(new Error('CDP timed out')); }, 10000);
       pending.set(requestId, value => { clearTimeout(timer); resolve(value); });
-      socket.send(JSON.stringify({ id: requestId, method, params }));
+      socket.send(JSON.stringify({ id: requestId, method, params, sessionId }));
     });
     assert.ok(!response.error, JSON.stringify(response));
     return response.result;
